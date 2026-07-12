@@ -20,6 +20,7 @@ export interface LayoutProps {
   onToggleSidebar: () => void;
   onTabChange: (tab: SidebarTab) => void;
   onAnalyze: () => void;
+  onInitModel?: () => void;
 }
 
 /**
@@ -43,6 +44,7 @@ const Layout: React.FC<LayoutProps> = ({
   onToggleSidebar,
   onTabChange,
   onAnalyze,
+  onInitModel,
 }) => {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0a0a0f]">
@@ -51,6 +53,7 @@ const Layout: React.FC<LayoutProps> = ({
         status={status}
         onToggleSidebar={onToggleSidebar}
         isSidebarOpen={sidebarState.isOpen}
+        onInitModel={onInitModel}
       />
 
       {/* Main Content Area */}

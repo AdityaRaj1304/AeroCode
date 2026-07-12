@@ -1,150 +1,324 @@
 // ============================================================
-// AeroCode Web — LLM Service (WebLLM)
+// AeroCode Web — LLM Service (Worker Proxy)
 // ============================================================
-// Manages on-device LLM inference using @mlc-ai/web-llm.
-// Provides code review, explanation, and chat capabilities
-// entirely within the browser — no network required.
+// Manages the Web Worker that runs @mlc-ai/web-llm off the
+// main thread. Provides a clean async API for the React UI.
+//
+// All LLM inference runs in /workers/llm.worker.ts — this
+// service only handles message routing and promise resolution.
 // ============================================================
 
-import type { AIReviewResult } from '../types';
+import type {
+  AIReviewResult,
+  WorkerRequest,
+  WorkerResponse,
+  WorkerResponseEvent,
+  InitProgressPayload,
+  InitCompletePayload,
+  InitErrorPayload,
+  TokenStreamPayload,
+  GenerationCompletePayload,
+  GenerationErrorPayload,
+  WebGPUUnsupportedPayload,
+} from '../types';
 
-/** Progress callback for model loading. */
+// ── Callback types ───────────────────────────────────────────
+
+/** Fired during model download with percentage + status message. */
 export type ProgressCallback = (progress: number, message: string) => void;
 
-/** Configuration for the LLM service. */
-export interface LLMServiceConfig {
-  modelId: string;
-  onProgress?: ProgressCallback;
+/** Fired each time a new token is generated. */
+export type TokenCallback = (token: string, fullText: string) => void;
+
+/** Fired if WebGPU is not supported on the client. */
+export type WebGPUErrorCallback = (
+  error: string,
+  suggestion: string
+) => void;
+
+// ── Pending request tracker ──────────────────────────────────
+
+interface PendingRequest {
+  resolve: (value: string) => void;
+  reject: (reason: Error) => void;
+  onToken?: TokenCallback;
 }
 
-const DEFAULT_MODEL = 'Phi-3.5-mini-instruct-q4f16_1-MLC';
+// ── Default model ────────────────────────────────────────────
 
-/**
- * LLM Service — wraps @mlc-ai/web-llm for air-gapped inference.
- *
- * Usage:
- *   const service = new LLMService({ modelId: '...' });
- *   await service.initialize();
- *   const review = await service.reviewCode(code);
- */
+const DEFAULT_MODEL = 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC';
+
+// ── Service Class ────────────────────────────────────────────
+
 class LLMService {
-  private engine: unknown = null;
-  private modelId: string;
-  private onProgress?: ProgressCallback;
+  private worker: Worker | null = null;
+  private pending = new Map<string, PendingRequest>();
   private _isReady = false;
+  private _isInitializing = false;
+  private _modelId: string = DEFAULT_MODEL;
+  private _requestCounter = 0;
 
-  constructor(config?: Partial<LLMServiceConfig>) {
-    this.modelId = config?.modelId ?? DEFAULT_MODEL;
-    this.onProgress = config?.onProgress;
-  }
+  // Callbacks set by the React UI
+  public onProgress?: ProgressCallback;
+  public onWebGPUError?: WebGPUErrorCallback;
 
-  /** Whether the engine has been successfully initialized. */
+  // ── Public getters ────────────────────────────────────────
+
   get isReady(): boolean {
     return this._isReady;
   }
 
-  /** The model name currently loaded (or pending). */
-  get modelName(): string {
-    return this.modelId;
+  get isInitializing(): boolean {
+    return this._isInitializing;
   }
 
-  /**
-   * Initialize the WebLLM engine.
-   * Downloads and caches the model in the browser's IndexedDB.
-   */
-  async initialize(): Promise<void> {
-    try {
-      // Dynamic import to avoid bundling issues if the package isn't ready
-      const webllm = await import('@mlc-ai/web-llm');
+  get modelName(): string {
+    return this._modelId;
+  }
 
-      this.engine = await webllm.CreateMLCEngine(this.modelId, {
-        initProgressCallback: (report: { progress: number; text: string }) => {
-          const pct = Math.round(report.progress * 100);
-          this.onProgress?.(pct, report.text);
+  // ── Worker Lifecycle ──────────────────────────────────────
+
+  /**
+   * Initialize the LLM model via the Web Worker.
+   * Streams progress back through `onProgress` callback.
+   */
+  async initialize(modelId?: string): Promise<void> {
+    if (this._isReady || this._isInitializing) return;
+
+    this._modelId = modelId ?? DEFAULT_MODEL;
+    this._isInitializing = true;
+
+    // Spawn the Web Worker using Vite's worker import syntax
+    this.worker = new Worker(
+      new URL('../workers/llm.worker.ts', import.meta.url),
+      { type: 'module' }
+    );
+
+    // Wire up the message handler
+    this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      this.handleWorkerMessage(event.data);
+    };
+
+    this.worker.onerror = (event: ErrorEvent) => {
+      console.error('[LLMService] Worker error:', event.message);
+      this._isInitializing = false;
+    };
+
+    // Send INIT_MODEL request and wait for completion
+    return new Promise<void>((resolve, reject) => {
+      const id = this.nextId();
+      this.pending.set(id, {
+        resolve: () => {
+          this._isReady = true;
+          this._isInitializing = false;
+          resolve();
+        },
+        reject: (err) => {
+          this._isInitializing = false;
+          reject(err);
         },
       });
 
-      this._isReady = true;
-      this.onProgress?.(100, 'Model ready');
-    } catch (error) {
-      console.error('[LLMService] Initialization failed:', error);
-      this._isReady = false;
-      throw error;
-    }
-  }
-
-  /**
-   * Generate an AI code review for the given source code.
-   */
-  async reviewCode(code: string, language: string): Promise<AIReviewResult[]> {
-    if (!this._isReady || !this.engine) {
-      return this.getMockReviews(code);
-    }
-
-    try {
-      const prompt = this.buildReviewPrompt(code, language);
-      const response = await this.chat(prompt);
-      return this.parseReviewResponse(response);
-    } catch {
-      return this.getMockReviews(code);
-    }
-  }
-
-  /**
-   * Generate an explanation for the given source code.
-   */
-  async explainCode(code: string, language: string): Promise<string> {
-    if (!this._isReady || !this.engine) {
-      return this.getMockExplanation(code, language);
-    }
-
-    try {
-      const prompt = `Explain the following ${language} code concisely. Focus on what each part does and any notable patterns:\n\n\`\`\`${language}\n${code}\n\`\`\``;
-      return await this.chat(prompt);
-    } catch {
-      return this.getMockExplanation(code, language);
-    }
-  }
-
-  /**
-   * Free-form chat with the AI about code.
-   */
-  async chatMessage(userMessage: string): Promise<string> {
-    if (!this._isReady || !this.engine) {
-      return 'The AI model is not yet loaded. Please wait for initialization to complete.';
-    }
-    return this.chat(userMessage);
-  }
-
-  /** Send a message to the engine and get a completion. */
-  private async chat(message: string): Promise<string> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const eng = this.engine as any;
-    const reply = await eng.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are AeroCode AI, a helpful pair-programming assistant running entirely on-device. Provide concise, actionable responses.',
-        },
-        { role: 'user', content: message },
-      ],
-      temperature: 0.3,
-      max_tokens: 1024,
+      this.send({
+        id,
+        action: 'INIT_MODEL',
+        payload: { modelId: this._modelId },
+      });
     });
-    return reply.choices[0]?.message?.content ?? '';
   }
 
-  /** Build the review prompt. */
-  private buildReviewPrompt(code: string, language: string): string {
-    return `Review the following ${language} code. For each issue found, respond with a JSON array of objects, each having: "title" (short), "content" (explanation), "severity" ("info" | "warning" | "error" | "success"), and "lineRange" (optional {start, end}).
+  /**
+   * Run a security-focused code review with streaming tokens.
+   */
+  async reviewCode(
+    code: string,
+    language: string,
+    onToken?: TokenCallback
+  ): Promise<AIReviewResult[]> {
+    if (!this._isReady) {
+      return this.getMockReviews(code);
+    }
 
-\`\`\`${language}
-${code}
-\`\`\`
-
-Respond ONLY with the JSON array.`;
+    try {
+      const raw = await this.requestGeneration(
+        'GENERATE_REVIEW',
+        { code, language },
+        onToken
+      );
+      return this.parseReviewResponse(raw);
+    } catch (err) {
+      console.error('[LLMService] Review failed:', err);
+      return this.getMockReviews(code);
+    }
   }
+
+  /**
+   * Generate a plain-English explanation with streaming tokens.
+   */
+  async explainCode(
+    code: string,
+    language: string,
+    onToken?: TokenCallback
+  ): Promise<string> {
+    if (!this._isReady) {
+      return this.getMockExplanation(code, language);
+    }
+
+    try {
+      return await this.requestGeneration(
+        'EXPLAIN_CODE',
+        { code, language },
+        onToken
+      );
+    } catch (err) {
+      console.error('[LLMService] Explanation failed:', err);
+      return this.getMockExplanation(code, language);
+    }
+  }
+
+  /**
+   * Tear down the worker and free resources.
+   */
+  dispose(): void {
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+    this.pending.clear();
+    this._isReady = false;
+    this._isInitializing = false;
+  }
+
+  // ── Private: Messaging ────────────────────────────────────
+
+  /** Send a typed request to the worker. */
+  private send(request: WorkerRequest): void {
+    this.worker?.postMessage(request);
+  }
+
+  /** Generate a unique request ID. */
+  private nextId(): string {
+    return `req-${++this._requestCounter}-${Date.now()}`;
+  }
+
+  /** Send a generation request and return a promise for the full text. */
+  private requestGeneration(
+    action: 'GENERATE_REVIEW' | 'EXPLAIN_CODE',
+    payload: { code: string; language: string },
+    onToken?: TokenCallback
+  ): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const id = this.nextId();
+      this.pending.set(id, { resolve, reject, onToken });
+      this.send({ id, action, payload });
+    });
+  }
+
+  /** Route worker messages to the appropriate handler. */
+  private handleWorkerMessage(msg: WorkerResponse): void {
+    const { id, event, payload } = msg;
+    const handler = this.getEventHandler(event);
+    handler(id, payload);
+  }
+
+  /** Map event names to handler methods. */
+  private getEventHandler(
+    event: WorkerResponseEvent
+  ): (id: string, payload: unknown) => void {
+    const handlers: Record<
+      WorkerResponseEvent,
+      (id: string, payload: unknown) => void
+    > = {
+      INIT_PROGRESS: (id, p) =>
+        this.handleInitProgress(id, p as InitProgressPayload),
+      INIT_COMPLETE: (id, p) =>
+        this.handleInitComplete(id, p as InitCompletePayload),
+      INIT_ERROR: (id, p) =>
+        this.handleInitError(id, p as InitErrorPayload),
+      TOKEN_STREAM: (id, p) =>
+        this.handleTokenStream(id, p as TokenStreamPayload),
+      GENERATION_COMPLETE: (id, p) =>
+        this.handleGenerationComplete(id, p as GenerationCompletePayload),
+      GENERATION_ERROR: (id, p) =>
+        this.handleGenerationError(id, p as GenerationErrorPayload),
+      WEBGPU_UNSUPPORTED: (id, p) =>
+        this.handleWebGPUUnsupported(id, p as WebGPUUnsupportedPayload),
+    };
+
+    return handlers[event] ?? (() => {});
+  }
+
+  // ── Event Handlers ────────────────────────────────────────
+
+  private handleInitProgress(
+    _id: string,
+    payload: InitProgressPayload
+  ): void {
+    this.onProgress?.(payload.progress, payload.message);
+  }
+
+  private handleInitComplete(
+    id: string,
+    _payload: InitCompletePayload
+  ): void {
+    const req = this.pending.get(id);
+    if (req) {
+      req.resolve('');
+      this.pending.delete(id);
+    }
+  }
+
+  private handleInitError(id: string, payload: InitErrorPayload): void {
+    const req = this.pending.get(id);
+    if (req) {
+      req.reject(new Error(payload.error));
+      this.pending.delete(id);
+    }
+  }
+
+  private handleTokenStream(
+    id: string,
+    payload: TokenStreamPayload
+  ): void {
+    const req = this.pending.get(id);
+    req?.onToken?.(payload.token, payload.fullText);
+  }
+
+  private handleGenerationComplete(
+    id: string,
+    payload: GenerationCompletePayload
+  ): void {
+    const req = this.pending.get(id);
+    if (req) {
+      req.resolve(payload.fullText);
+      this.pending.delete(id);
+    }
+  }
+
+  private handleGenerationError(
+    id: string,
+    payload: GenerationErrorPayload
+  ): void {
+    const req = this.pending.get(id);
+    if (req) {
+      req.reject(new Error(payload.error));
+      this.pending.delete(id);
+    }
+  }
+
+  private handleWebGPUUnsupported(
+    id: string,
+    payload: WebGPUUnsupportedPayload
+  ): void {
+    this.onWebGPUError?.(payload.error, payload.suggestion);
+    const req = this.pending.get(id);
+    if (req) {
+      req.reject(new Error(payload.error));
+      this.pending.delete(id);
+    }
+  }
+
+  // ── Fallbacks ─────────────────────────────────────────────
 
   /** Parse a JSON review response into AIReviewResult objects. */
   private parseReviewResponse(response: string): AIReviewResult[] {
@@ -221,17 +395,7 @@ Respond ONLY with the JSON array.`;
   /** Fallback mock explanation. */
   private getMockExplanation(code: string, language: string): string {
     const lineCount = code.split('\n').length;
-    return `## Code Explanation (${language})\n\nThis is a ${lineCount}-line ${language} snippet. The AI model is still loading — once ready, AeroCode will provide a detailed, context-aware explanation.\n\n**Tip:** Click "Load Model" in the status bar to start downloading the on-device AI model.`;
-  }
-
-  /** Tear down the engine and free resources. */
-  async dispose(): Promise<void> {
-    if (this.engine) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (this.engine as any).unload?.();
-      this.engine = null;
-      this._isReady = false;
-    }
+    return `## Code Explanation (${language})\n\nThis is a ${lineCount}-line ${language} snippet. The AI model is still loading — once ready, AeroCode will provide a detailed, context-aware explanation.\n\n**Tip:** Click "Load Model" in the navbar to start downloading the on-device AI model.`;
   }
 }
 

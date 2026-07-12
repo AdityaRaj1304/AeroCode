@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Layout from './components/layout/Layout';
 import { llmService } from './services/llmService';
 import type {
@@ -10,14 +10,15 @@ import type {
   AIReviewResult,
 } from './types';
 
-// Default code shown in the editor on first load
+// ── Default editor code ──────────────────────────────────────
+
 const DEFAULT_CODE = `// ✨ Welcome to AeroCode — Air-Gapped AI Pair Programmer
 //
 // All AI processing happens entirely on your device.
 // No data ever leaves your browser. 🔒
 //
-// Try writing some code, then click "Analyze Code"
-// in the AI panel on the right →
+// 1. Click "Load Model" in the top-right to download the AI model
+// 2. Once loaded, click "Analyze Code" in the AI panel →
 
 interface User {
   id: string;
@@ -57,10 +58,12 @@ fetchUsers(API_URL)
   .catch(console.error);
 `;
 
+// ── App Component ────────────────────────────────────────────
+
 function App() {
   // ── Air-Gap Status ─────────────────────────────────────────
   const [status, setStatus] = useState<AirGapStatus>({
-    isOnline: false,
+    isOnline: false,     // repurposed: true while initializing
     modelLoaded: false,
     modelName: llmService.modelName,
     loadProgress: 0,
@@ -84,7 +87,76 @@ function App() {
     isProcessing: false,
   });
 
-  // ── Handlers ───────────────────────────────────────────────
+  // ── WebGPU Error State ─────────────────────────────────────
+  const [gpuError, setGpuError] = useState<string | null>(null);
+
+  // ── Ref to avoid stale closures ────────────────────────────
+  const initCalledRef = useRef(false);
+
+  // ── Wire up LLM service callbacks ─────────────────────────
+  useEffect(() => {
+    // Progress callback — streams model download % to the UI
+    llmService.onProgress = (progress: number, message: string) => {
+      setStatus((prev) => ({
+        ...prev,
+        loadProgress: progress,
+        modelName: message.length > 60 ? message.slice(0, 57) + '...' : message,
+      }));
+    };
+
+    // WebGPU not supported callback
+    llmService.onWebGPUError = (error: string, suggestion: string) => {
+      console.warn('[AeroCode] WebGPU unsupported:', error);
+      setGpuError(`${error}\n\n${suggestion}`);
+      setStatus((prev) => ({
+        ...prev,
+        isOnline: false,
+        loadProgress: 0,
+      }));
+    };
+
+    return () => {
+      llmService.dispose();
+    };
+  }, []);
+
+  // ── Model Initialization ───────────────────────────────────
+
+  const handleInitModel = useCallback(async () => {
+    if (initCalledRef.current || llmService.isReady) return;
+    initCalledRef.current = true;
+
+    setStatus((prev) => ({
+      ...prev,
+      isOnline: true,
+      loadProgress: 0,
+      modelName: 'Starting download...',
+    }));
+    setGpuError(null);
+
+    try {
+      await llmService.initialize();
+      setStatus((prev) => ({
+        ...prev,
+        isOnline: false,
+        modelLoaded: true,
+        modelName: llmService.modelName,
+        loadProgress: 100,
+        lastSync: new Date(),
+      }));
+    } catch (err) {
+      console.error('[AeroCode] Model init failed:', err);
+      initCalledRef.current = false;
+      setStatus((prev) => ({
+        ...prev,
+        isOnline: false,
+        loadProgress: 0,
+        modelName: llmService.modelName,
+      }));
+    }
+  }, []);
+
+  // ── Editor Handlers ────────────────────────────────────────
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     setEditorState((prev) => ({
@@ -100,6 +172,8 @@ function App() {
     }));
   }, []);
 
+  // ── Sidebar Handlers ───────────────────────────────────────
+
   const handleToggleSidebar = useCallback(() => {
     setSidebarState((prev) => ({
       ...prev,
@@ -114,6 +188,8 @@ function App() {
     }));
   }, []);
 
+  // ── Analyze / Explain (Worker-backed) ──────────────────────
+
   const handleAnalyze = useCallback(async () => {
     setSidebarState((prev) => ({
       ...prev,
@@ -125,10 +201,30 @@ function App() {
       let results: AIReviewResult[];
 
       if (sidebarState.activeTab === 'explain') {
+        // Stream explanation tokens into a single review card
+        let streamedText = '';
         const explanation = await llmService.explainCode(
           editorState.value,
-          editorState.language
+          editorState.language,
+          (_token, fullText) => {
+            streamedText = fullText;
+            // Update the sidebar with streaming text in real-time
+            setSidebarState((prev) => ({
+              ...prev,
+              reviews: [
+                {
+                  id: 'explain-streaming',
+                  type: 'explanation',
+                  title: 'Code Explanation',
+                  content: streamedText,
+                  severity: 'info',
+                  timestamp: new Date(),
+                },
+              ],
+            }));
+          }
         );
+
         results = [
           {
             id: `explain-${Date.now()}`,
@@ -140,10 +236,31 @@ function App() {
           },
         ];
       } else {
-        results = await llmService.reviewCode(
+        // Stream review tokens then parse the final JSON
+        let streamedText = '';
+        const reviewResults = await llmService.reviewCode(
           editorState.value,
-          editorState.language
+          editorState.language,
+          (_token, fullText) => {
+            streamedText = fullText;
+            // Show raw streaming text as a single review card
+            setSidebarState((prev) => ({
+              ...prev,
+              reviews: [
+                {
+                  id: 'review-streaming',
+                  type: 'review',
+                  title: 'Analyzing...',
+                  content: streamedText,
+                  severity: 'info',
+                  timestamp: new Date(),
+                },
+              ],
+            }));
+          }
         );
+
+        results = reviewResults;
       }
 
       setSidebarState((prev) => ({
@@ -156,27 +273,64 @@ function App() {
       setSidebarState((prev) => ({
         ...prev,
         isProcessing: false,
+        reviews: [
+          {
+            id: `error-${Date.now()}`,
+            type: 'review',
+            title: 'Analysis Failed',
+            content:
+              error instanceof Error
+                ? error.message
+                : 'An unknown error occurred during analysis.',
+            severity: 'error',
+            timestamp: new Date(),
+          },
+        ],
       }));
     }
   }, [sidebarState.activeTab, editorState.value, editorState.language]);
 
-  // ── Initialize LLM (deferred) ─────────────────────────────
-  // Model loading is intentionally NOT auto-started.
-  // Users can trigger it from the UI when ready.
-  // For now, mock reviews work without the model.
-  void setStatus; // suppress unused — used when model loading is wired up
+  // ── Render ─────────────────────────────────────────────────
 
   return (
-    <Layout
-      status={status}
-      editorState={editorState}
-      sidebarState={sidebarState}
-      onEditorChange={handleEditorChange}
-      onCursorChange={handleCursorChange}
-      onToggleSidebar={handleToggleSidebar}
-      onTabChange={handleTabChange}
-      onAnalyze={handleAnalyze}
-    />
+    <>
+      <Layout
+        status={status}
+        editorState={editorState}
+        sidebarState={sidebarState}
+        onEditorChange={handleEditorChange}
+        onCursorChange={handleCursorChange}
+        onToggleSidebar={handleToggleSidebar}
+        onTabChange={handleTabChange}
+        onAnalyze={handleAnalyze}
+        onInitModel={handleInitModel}
+      />
+
+      {/* WebGPU Error Modal */}
+      {gpuError && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="mx-4 max-w-lg rounded-2xl border border-red-500/20 bg-[#12121a] p-6 shadow-2xl">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10">
+                <span className="text-lg">⚠️</span>
+              </div>
+              <h3 className="text-lg font-semibold text-white">
+                WebGPU Not Available
+              </h3>
+            </div>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-400">
+              {gpuError}
+            </p>
+            <button
+              onClick={() => setGpuError(null)}
+              className="mt-4 rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

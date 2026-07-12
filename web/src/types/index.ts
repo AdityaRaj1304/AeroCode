@@ -59,6 +59,7 @@ export interface NavbarProps {
   status: AirGapStatus;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
+  onInitModel?: () => void;
 }
 
 /** Props for the code editor wrapper. */
@@ -96,3 +97,114 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
 }
+
+// ============================================================
+// Worker Message Protocol
+// ============================================================
+// Bidirectional typed messaging between the React UI thread
+// and the LLM Web Worker.
+// ============================================================
+
+/** Actions the UI can request from the worker. */
+export type WorkerRequestAction =
+  | 'INIT_MODEL'
+  | 'GENERATE_REVIEW'
+  | 'EXPLAIN_CODE';
+
+/** Events the worker can send back to the UI. */
+export type WorkerResponseEvent =
+  | 'INIT_PROGRESS'
+  | 'INIT_COMPLETE'
+  | 'INIT_ERROR'
+  | 'TOKEN_STREAM'
+  | 'GENERATION_COMPLETE'
+  | 'GENERATION_ERROR'
+  | 'WEBGPU_UNSUPPORTED';
+
+/** Message sent from the UI thread → Worker. */
+export interface WorkerRequest {
+  id: string;
+  action: WorkerRequestAction;
+  payload: InitModelPayload | GenerateReviewPayload | ExplainCodePayload;
+}
+
+/** Payload for INIT_MODEL action. */
+export interface InitModelPayload {
+  modelId: string;
+}
+
+/** Payload for GENERATE_REVIEW action. */
+export interface GenerateReviewPayload {
+  code: string;
+  language: string;
+}
+
+/** Payload for EXPLAIN_CODE action. */
+export interface ExplainCodePayload {
+  code: string;
+  language: string;
+}
+
+/** Message sent from Worker → UI thread. */
+export interface WorkerResponse {
+  id: string;
+  event: WorkerResponseEvent;
+  payload: WorkerResponsePayload;
+}
+
+/** Union of all possible worker response payloads. */
+export type WorkerResponsePayload =
+  | InitProgressPayload
+  | InitCompletePayload
+  | InitErrorPayload
+  | TokenStreamPayload
+  | GenerationCompletePayload
+  | GenerationErrorPayload
+  | WebGPUUnsupportedPayload;
+
+/** Streaming progress during model download/initialization. */
+export interface InitProgressPayload {
+  progress: number; // 0–100
+  message: string;
+  timeElapsed?: number; // ms
+}
+
+/** Emitted once when model is fully loaded and ready. */
+export interface InitCompletePayload {
+  modelId: string;
+  message: string;
+}
+
+/** Emitted if model initialization fails. */
+export interface InitErrorPayload {
+  error: string;
+  recoverable: boolean;
+}
+
+/** A single streamed token during generation. */
+export interface TokenStreamPayload {
+  token: string;
+  fullText: string;
+  tokenIndex: number;
+}
+
+/** Emitted when generation finishes. */
+export interface GenerationCompletePayload {
+  fullText: string;
+  totalTokens: number;
+  durationMs: number;
+}
+
+/** Emitted if generation fails. */
+export interface GenerationErrorPayload {
+  error: string;
+  partialText?: string;
+}
+
+/** Emitted if the client GPU does not support WebGPU. */
+export interface WebGPUUnsupportedPayload {
+  error: string;
+  userAgent: string;
+  suggestion: string;
+}
+
