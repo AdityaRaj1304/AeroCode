@@ -166,10 +166,15 @@ function App() {
   }, []);
 
   const handleCursorChange = useCallback((position: CursorPosition) => {
-    setEditorState((prev) => ({
-      ...prev,
-      cursorPosition: position,
-    }));
+    setEditorState((prev) => ({ ...prev, cursorPosition: position }));
+  }, []);
+
+  const handleSelectionChange = useCallback((selection: any) => {
+    setEditorState((prev) => ({ ...prev, selection }));
+  }, []);
+
+  const handleToggleDiff = useCallback(() => {
+    setEditorState((prev) => ({ ...prev, showDiff: !prev.showDiff }));
   }, []);
 
   // ── Sidebar Handlers ───────────────────────────────────────
@@ -190,105 +195,96 @@ function App() {
 
   // ── Analyze / Explain (Worker-backed) ──────────────────────
 
-  const handleAnalyze = useCallback(async () => {
+  const handleAnalyzeCode = useCallback(async () => {
+    if (!editorState.value.trim()) return;
+    if (editorState.selection && !editorState.selection.text.trim()) return;
+
+    setSidebarState((prev) => ({ ...prev, isProcessing: true }));
+
+    const reviews = await llmService.reviewCode(
+      editorState.value,
+      editorState.language,
+      editorState.selection?.text
+    );
+
+    setSidebarState((prev) => ({
+      ...prev,
+      reviews,
+      isProcessing: false,
+      isOpen: true,
+      activeTab: 'review',
+    }));
+  }, [editorState]);
+
+  const handleExplainCode = useCallback(async () => {
+    if (!editorState.value.trim()) return;
+    if (editorState.selection && !editorState.selection.text.trim()) return;
+
     setSidebarState((prev) => ({
       ...prev,
       isProcessing: true,
-      reviews: [],
+      isOpen: true,
+      activeTab: 'explain',
+      explanationStream: '',
     }));
 
     try {
-      let results: AIReviewResult[];
-
-      if (sidebarState.activeTab === 'explain') {
-        // Stream explanation tokens into a single review card
-        let streamedText = '';
-        const explanation = await llmService.explainCode(
-          editorState.value,
-          editorState.language,
-          (_token, fullText) => {
-            streamedText = fullText;
-            // Update the sidebar with streaming text in real-time
-            setSidebarState((prev) => ({
-              ...prev,
-              reviews: [
-                {
-                  id: 'explain-streaming',
-                  type: 'explanation',
-                  title: 'Code Explanation',
-                  content: streamedText,
-                  severity: 'info',
-                  timestamp: new Date(),
-                },
-              ],
-            }));
-          }
-        );
-
-        results = [
-          {
-            id: `explain-${Date.now()}`,
-            type: 'explanation',
-            title: 'Code Explanation',
-            content: explanation,
-            severity: 'info',
-            timestamp: new Date(),
-          },
-        ];
-      } else {
-        // Stream review tokens then parse the final JSON
-        let streamedText = '';
-        const reviewResults = await llmService.reviewCode(
-          editorState.value,
-          editorState.language,
-          (_token, fullText) => {
-            streamedText = fullText;
-            // Show raw streaming text as a single review card
-            setSidebarState((prev) => ({
-              ...prev,
-              reviews: [
-                {
-                  id: 'review-streaming',
-                  type: 'review',
-                  title: 'Analyzing...',
-                  content: streamedText,
-                  severity: 'info',
-                  timestamp: new Date(),
-                },
-              ],
-            }));
-          }
-        );
-
-        results = reviewResults;
-      }
-
-      setSidebarState((prev) => ({
-        ...prev,
-        reviews: results,
-        isProcessing: false,
-      }));
+      await llmService.explainCode(
+        editorState.value,
+        editorState.language,
+        editorState.selection?.text,
+        (token) => {
+          setSidebarState((prev) => ({
+            ...prev,
+            explanationStream: (prev.explanationStream || '') + token,
+          }));
+        }
+      );
     } catch (error) {
-      console.error('[AeroCode] Analysis failed:', error);
+      console.error('Explanation failed:', error);
       setSidebarState((prev) => ({
         ...prev,
-        isProcessing: false,
-        reviews: [
-          {
-            id: `error-${Date.now()}`,
-            type: 'review',
-            title: 'Analysis Failed',
-            content:
-              error instanceof Error
-                ? error.message
-                : 'An unknown error occurred during analysis.',
-            severity: 'error',
-            timestamp: new Date(),
-          },
-        ],
+        explanationStream: 'Error generating explanation.',
       }));
+    } finally {
+      setSidebarState((prev) => ({ ...prev, isProcessing: false }));
     }
-  }, [sidebarState.activeTab, editorState.value, editorState.language]);
+  }, [editorState]);
+
+  const handleRefactorCode = useCallback(async () => {
+    if (!editorState.value.trim()) return;
+
+    setSidebarState((prev) => ({
+      ...prev,
+      isProcessing: true,
+      isOpen: true,
+      activeTab: 'review',
+    }));
+
+    setEditorState((prev) => ({
+      ...prev,
+      showDiff: true,
+      modifiedValue: '',
+    }));
+
+    try {
+      await llmService.refactorCode(
+        editorState.value,
+        editorState.language,
+        editorState.selection?.text,
+        (token) => {
+          setEditorState((prev) => ({
+            ...prev,
+            modifiedValue: (prev.modifiedValue || '') + token,
+          }));
+        }
+      );
+    } catch (error) {
+      console.error('Refactoring failed:', error);
+    } finally {
+      setSidebarState((prev) => ({ ...prev, isProcessing: false }));
+    }
+  }, [editorState]);
 
   // ── Render ─────────────────────────────────────────────────
 
@@ -302,8 +298,12 @@ function App() {
         onCursorChange={handleCursorChange}
         onToggleSidebar={handleToggleSidebar}
         onTabChange={handleTabChange}
-        onAnalyze={handleAnalyze}
+        onAnalyze={handleAnalyzeCode}
+        onRefactor={handleRefactorCode}
+        onExplain={handleExplainCode}
         onInitModel={handleInitModel}
+        onSelectionChange={handleSelectionChange}
+        onToggleDiff={handleToggleDiff}
       />
 
       {/* WebGPU Error Modal */}

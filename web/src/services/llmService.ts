@@ -133,6 +133,7 @@ class LLMService {
   async reviewCode(
     code: string,
     language: string,
+    selection?: string,
     onToken?: TokenCallback
   ): Promise<AIReviewResult[]> {
     if (!this._isReady) {
@@ -142,7 +143,7 @@ class LLMService {
     try {
       const raw = await this.requestGeneration(
         'GENERATE_REVIEW',
-        { code, language },
+        { code, language, selection },
         onToken
       );
       return this.parseReviewResponse(raw);
@@ -158,6 +159,7 @@ class LLMService {
   async explainCode(
     code: string,
     language: string,
+    selection?: string,
     onToken?: TokenCallback
   ): Promise<string> {
     if (!this._isReady) {
@@ -167,12 +169,41 @@ class LLMService {
     try {
       return await this.requestGeneration(
         'EXPLAIN_CODE',
-        { code, language },
+        { code, language, selection },
         onToken
       );
     } catch (err) {
       console.error('[LLMService] Explanation failed:', err);
       return this.getMockExplanation(code, language);
+    }
+  }
+
+  /**
+   * Generate a refactored version of the code (or selection) with streaming tokens.
+   * Strips markdown to ensure strict raw code output.
+   */
+  async refactorCode(
+    code: string,
+    language: string,
+    selection?: string,
+    onToken?: TokenCallback
+  ): Promise<string> {
+    if (!this._isReady) {
+      return code; // Fallback to original code if model isn't ready
+    }
+
+    try {
+      const raw = await this.requestGeneration(
+        'REFACTOR_CODE',
+        { code, language, selection },
+        onToken
+      );
+      
+      // Strict stripping of markdown blocks just in case the model ignores the prompt
+      return raw.replace(/^```[\w-]*\n/gm, '').replace(/```\s*$/gm, '').trim();
+    } catch (err) {
+      console.error('[LLMService] Refactoring failed:', err);
+      return code;
     }
   }
 
@@ -203,8 +234,8 @@ class LLMService {
 
   /** Send a generation request and return a promise for the full text. */
   private requestGeneration(
-    action: 'GENERATE_REVIEW' | 'EXPLAIN_CODE',
-    payload: { code: string; language: string },
+    action: 'GENERATE_REVIEW' | 'EXPLAIN_CODE' | 'REFACTOR_CODE',
+    payload: { code: string; language: string; selection?: string },
     onToken?: TokenCallback
   ): Promise<string> {
     return new Promise<string>((resolve, reject) => {

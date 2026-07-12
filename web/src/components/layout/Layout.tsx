@@ -20,7 +20,11 @@ export interface LayoutProps {
   onToggleSidebar: () => void;
   onTabChange: (tab: SidebarTab) => void;
   onAnalyze: () => void;
+  onRefactor: () => void;
+  onExplain?: () => void;
   onInitModel?: () => void;
+  onSelectionChange?: (selection: any) => void;
+  onToggleDiff?: () => void;
 }
 
 /**
@@ -44,7 +48,11 @@ const Layout: React.FC<LayoutProps> = ({
   onToggleSidebar,
   onTabChange,
   onAnalyze,
+  onRefactor,
+  onExplain,
   onInitModel,
+  onSelectionChange,
+  onToggleDiff,
 }) => {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0a0a0f]">
@@ -64,6 +72,8 @@ const Layout: React.FC<LayoutProps> = ({
             editorState={editorState}
             onEditorChange={onEditorChange}
             onCursorChange={onCursorChange}
+            onSelectionChange={onSelectionChange}
+            onToggleDiff={onToggleDiff}
           />
         </div>
 
@@ -73,6 +83,8 @@ const Layout: React.FC<LayoutProps> = ({
           onTabChange={onTabChange}
           onClose={onToggleSidebar}
           onAnalyze={onAnalyze}
+          onRefactor={onRefactor}
+          onExplain={onExplain}
         />
       </div>
     </div>

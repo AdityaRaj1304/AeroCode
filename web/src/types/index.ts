@@ -15,15 +15,27 @@ export interface AirGapStatus {
 export interface EditorState {
   language: string;
   value: string;
+  modifiedValue?: string; // For Diff Editor
+  showDiff?: boolean;     // Toggle Diff Editor
   theme: 'aerocode-dark' | 'vs-dark';
   fileName: string;
   cursorPosition: CursorPosition;
+  selection?: TextSelection; // Currently highlighted text
 }
 
 /** Cursor location within the editor. */
 export interface CursorPosition {
   line: number;
   column: number;
+}
+
+/** Selected text range. */
+export interface TextSelection {
+  startLine: number;
+  endLine: number;
+  startColumn: number;
+  endColumn: number;
+  text: string;
 }
 
 /** A single AI-generated review, explanation, or suggestion. */
@@ -49,6 +61,7 @@ export interface SidebarState {
   activeTab: SidebarTab;
   reviews: AIReviewResult[];
   isProcessing: boolean;
+  explanationStream?: string;
 }
 
 /** Available sidebar tab identifiers. */
@@ -67,6 +80,8 @@ export interface CodeEditorProps {
   editorState: EditorState;
   onEditorChange: (value: string | undefined) => void;
   onCursorChange: (position: CursorPosition) => void;
+  onSelectionChange?: (selection: TextSelection | undefined) => void;
+  onToggleDiff?: () => void;
 }
 
 /** Props for the collapsible sidebar. */
@@ -75,6 +90,9 @@ export interface SidebarProps {
   onTabChange: (tab: SidebarTab) => void;
   onClose: () => void;
   onAnalyze: () => void;
+  onRefactor: () => void;
+  onExplain?: () => void;
+  onInitModel?: () => void;
 }
 
 /** Props for the StatusBadge UI component. */
@@ -109,7 +127,8 @@ export interface ChatMessage {
 export type WorkerRequestAction =
   | 'INIT_MODEL'
   | 'GENERATE_REVIEW'
-  | 'EXPLAIN_CODE';
+  | 'EXPLAIN_CODE'
+  | 'REFACTOR_CODE';
 
 /** Events the worker can send back to the UI. */
 export type WorkerResponseEvent =
@@ -125,7 +144,7 @@ export type WorkerResponseEvent =
 export interface WorkerRequest {
   id: string;
   action: WorkerRequestAction;
-  payload: InitModelPayload | GenerateReviewPayload | ExplainCodePayload;
+  payload: InitModelPayload | GenerateReviewPayload | ExplainCodePayload | RefactorCodePayload;
 }
 
 /** Payload for INIT_MODEL action. */
@@ -137,12 +156,21 @@ export interface InitModelPayload {
 export interface GenerateReviewPayload {
   code: string;
   language: string;
+  selection?: string;
 }
 
 /** Payload for EXPLAIN_CODE action. */
 export interface ExplainCodePayload {
   code: string;
   language: string;
+  selection?: string;
+}
+
+/** Payload for REFACTOR_CODE action. */
+export interface RefactorCodePayload {
+  code: string;
+  language: string;
+  selection?: string;
 }
 
 /** Message sent from Worker → UI thread. */

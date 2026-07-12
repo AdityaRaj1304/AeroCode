@@ -20,6 +20,7 @@ import type {
   InitModelPayload,
   GenerateReviewPayload,
   ExplainCodePayload,
+  RefactorCodePayload,
 } from '../types';
 
 // ── State ────────────────────────────────────────────────────
@@ -63,6 +64,9 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       break;
     case 'EXPLAIN_CODE':
       await handleExplainCode(id, payload as ExplainCodePayload);
+      break;
+    case 'REFACTOR_CODE':
+      await handleRefactorCode(id, payload as RefactorCodePayload);
       break;
     default:
       respond(id, 'GENERATION_ERROR', {
@@ -167,7 +171,11 @@ async function handleGenerateReview(
   let fullText = '';
   let tokenIndex = 0;
 
-  const prompt = buildReviewPrompt(payload.code, payload.language);
+  const prompt = buildReviewPrompt(
+    payload.code,
+    payload.language,
+    payload.selection
+  );
 
   try {
     const asyncGenerator = await engine.chat.completions.create({
@@ -224,7 +232,11 @@ async function handleExplainCode(
   let fullText = '';
   let tokenIndex = 0;
 
-  const prompt = `Explain the following ${payload.language} code in plain English. Be concise but thorough. Cover what each section does, any notable patterns or idioms, and potential gotchas:\n\n\`\`\`${payload.language}\n${payload.code}\n\`\`\``;
+  const contextStr = payload.selection
+    ? `\n\nFocus specifically on explaining the highlighted selection:\n\`\`\`${payload.language}\n${payload.selection}\n\`\`\`\n\nFull file context:\n`
+    : '\n\nFull file code:\n';
+
+  const prompt = `Explain the following ${payload.language} code in plain English. Be concise but thorough. Cover what each section does, any notable patterns or idioms, and potential gotchas:${contextStr}\`\`\`${payload.language}\n${payload.code}\n\`\`\``;
 
   try {
     const asyncGenerator = await engine.chat.completions.create({
@@ -263,9 +275,77 @@ async function handleExplainCode(
   }
 }
 
+// ── REFACTOR_CODE ────────────────────────────────────────────
+
+async function handleRefactorCode(
+  id: string,
+  payload: RefactorCodePayload
+): Promise<void> {
+  if (!engine) {
+    respond(id, 'GENERATION_ERROR', {
+      error: 'Model not initialized. Please load the model first.',
+    });
+    return;
+  }
+
+  const startTime = performance.now();
+  let fullText = '';
+  let tokenIndex = 0;
+
+  const contextStr = payload.selection
+    ? `\n\nRefactor specifically the highlighted selection:\n\`\`\`${payload.language}\n${payload.selection}\n\`\`\`\n\nFull file context for reference:\n`
+    : '\n\nFull file code to refactor:\n';
+
+  const prompt = `Refactor the following ${payload.language} code to improve security, readability, and performance. Fix any bugs and optimize logic.${contextStr}\`\`\`${payload.language}\n${payload.code}\n\`\`\`\n\nCRITICAL OUTPUT REQUIREMENT:\nYou MUST output ONLY the raw, valid source code. You must NOT wrap the code in markdown backticks (e.g. \`\`\`). You must NOT include any introductory or explanatory text. If you do, the system will break. Output ONLY code.`;
+
+  try {
+    const asyncGenerator = await engine.chat.completions.create({
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.2, // Low temp for more deterministic code output
+      max_tokens: 2048,
+      stream: true,
+    });
+
+    for await (const chunk of asyncGenerator) {
+      const delta = chunk.choices[0]?.delta?.content ?? '';
+      if (delta) {
+        fullText += delta;
+        tokenIndex++;
+        respond(id, 'TOKEN_STREAM', {
+          token: delta,
+          fullText,
+          tokenIndex,
+        });
+      }
+    }
+
+    respond(id, 'GENERATION_COMPLETE', {
+      fullText,
+      totalTokens: tokenIndex,
+      durationMs: Math.round(performance.now() - startTime),
+    });
+  } catch (err) {
+    respond(id, 'GENERATION_ERROR', {
+      error: err instanceof Error ? err.message : 'Refactoring failed',
+      partialText: fullText || undefined,
+    });
+  }
+}
+
 // ── Prompt Builders ──────────────────────────────────────────
 
-function buildReviewPrompt(code: string, language: string): string {
+function buildReviewPrompt(
+  code: string,
+  language: string,
+  selection?: string
+): string {
+  const contextStr = selection
+    ? `\n\nFocus your review specifically on the highlighted selection:\n\`\`\`${language}\n${selection}\n\`\`\`\n\nFull file context:\n`
+    : '\n\nFull file code:\n';
+
   return `You are a senior security-focused code reviewer. Analyze the following ${language} code for:
 1. Security vulnerabilities (injection, XSS, auth issues, secrets exposure)
 2. Bug risks and logic errors
@@ -282,9 +362,7 @@ For each finding, respond with a JSON array of objects:
   }
 ]
 
-If the code looks good overall, include at least one "success" entry acknowledging good practices.
-
-\`\`\`${language}
+If the code looks good overall, include at least one "success" entry acknowledging good practices.${contextStr}\`\`\`${language}
 ${code}
 \`\`\`
 

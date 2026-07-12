@@ -32,6 +32,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onTabChange,
   onClose,
   onAnalyze,
+  onRefactor,
+  onExplain,
 }) => {
   const [chatInput, setChatInput] = useState('');
   const [chatMessages] = useState<ChatMessage[]>([]);
@@ -120,24 +122,43 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* Review Tab */}
         {sidebarState.activeTab === 'review' && (
           <div className="flex flex-col gap-3 p-4">
-            {/* Analyze Button */}
-            <button
-              onClick={onAnalyze}
-              disabled={sidebarState.isProcessing}
-              className="flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:from-indigo-500 hover:to-violet-500 hover:shadow-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {sidebarState.isProcessing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <FileSearch className="h-4 w-4" />
-                  Analyze Code
-                </>
-              )}
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={onAnalyze}
+                disabled={sidebarState.isProcessing}
+                className="flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:from-indigo-500 hover:to-violet-500 hover:shadow-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {sidebarState.isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    <FileSearch className="h-4 w-4" />
+                    Scan Vulnerabilities
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={onRefactor}
+                disabled={sidebarState.isProcessing}
+                className="flex items-center justify-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-300 transition-all duration-200 hover:border-indigo-500/50 hover:bg-indigo-500/20 hover:text-indigo-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {sidebarState.isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Refactoring...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Refactor Code (Diff)
+                  </>
+                )}
+              </button>
+            </div>
 
             {/* Review Cards */}
             {sidebarState.reviews.length === 0 && !sidebarState.isProcessing && (
@@ -146,7 +167,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <FileSearch className="h-6 w-6 text-slate-600" />
                 </div>
                 <p className="text-sm text-slate-500">
-                  Click "Analyze Code" to get AI-powered insights
+                  Select code and click "Scan Vulnerabilities" or "Refactor Code" for insights
                 </p>
               </div>
             )}
@@ -190,7 +211,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {sidebarState.activeTab === 'explain' && (
           <div className="flex flex-col gap-3 p-4">
             <button
-              onClick={onAnalyze}
+              onClick={onExplain}
               disabled={sidebarState.isProcessing}
               className="flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-600 to-teal-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-cyan-500/20 transition-all duration-200 hover:from-cyan-500 hover:to-teal-500 hover:shadow-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -202,7 +223,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Explain Code
+                  Explain Logic
                 </>
               )}
             </button>
