@@ -491,7 +491,7 @@ async function handleAutonomousLoop(
         status: 'success',
         attempt,
         maxAttempts,
-        message: 'Tests passed! ✅',
+        message: 'Tests passed.',
         code: currentCode,
       });
       return;
@@ -502,7 +502,7 @@ async function handleAutonomousLoop(
       status: 'analyzing',
       attempt,
       maxAttempts,
-      message: 'Tests failed. AI analyzing stack trace... 🧠',
+      message: 'Tests failed. AI analyzing stack trace...',
       stackTrace: testResult.stackTrace,
     });
 
@@ -530,7 +530,7 @@ You MUST output ONLY the raw, valid source code. You must NOT wrap the code in m
       status: 'applying_patch',
       attempt,
       maxAttempts,
-      message: 'Applying AI patch... ⚡',
+      message: 'Applying AI patch...',
     });
 
     try {
@@ -585,7 +585,7 @@ You MUST output ONLY the raw, valid source code. You must NOT wrap the code in m
     status: 'failed',
     attempt: maxAttempts,
     maxAttempts,
-    message: 'Max retries reached. Tests still failing. ❌',
+    message: 'Max retries reached. Tests still failing.',
   });
 }
 

@@ -21,6 +21,7 @@ import type {
   GenerationErrorPayload,
   WebGPUUnsupportedPayload,
   TelemetryPayload,
+  LoopProgressPayload,
 } from '../types';
 
 // ── Callback types ───────────────────────────────────────────
@@ -36,6 +37,9 @@ export type WebGPUErrorCallback = (
   error: string,
   suggestion: string
 ) => void;
+
+/** Fired during Autonomous Debugger loop */
+export type LoopProgressCallback = (payload: LoopProgressPayload) => void;
 
 // ── Pending request tracker ──────────────────────────────────
 
@@ -63,6 +67,7 @@ class LLMService {
   public onProgress?: ProgressCallback;
   public onWebGPUError?: WebGPUErrorCallback;
   public onTelemetry?: (payload: TelemetryPayload) => void;
+  public onLoopProgress?: LoopProgressCallback;
 
   // ── Public getters ────────────────────────────────────────
 
@@ -237,6 +242,30 @@ class LLMService {
   }
 
   /**
+   * Run the Autonomous Test-Driven Debugger loop.
+   */
+  async runAutonomousLoop(
+    code: string,
+    language: string,
+    testCode: string,
+    onToken?: TokenCallback
+  ): Promise<void> {
+    if (!this._isReady) return;
+
+    try {
+      // We don't await a single string back; it resolves when the loop is fully done.
+      // Progress is sent via LOOP_PROGRESS events to this.onLoopProgress.
+      await this.requestGeneration(
+        'RUN_AUTONOMOUS_LOOP',
+        { code, language, testCode } as any,
+        onToken
+      );
+    } catch (err) {
+      console.error('[LLMService] Autonomous Loop failed:', err);
+    }
+  }
+
+  /**
    * Tear down the worker and free resources.
    */
   dispose(): void {
@@ -263,7 +292,7 @@ class LLMService {
 
   /** Send a generation request and return a promise for the full text. */
   private requestGeneration(
-    action: 'GENERATE_REVIEW' | 'EXPLAIN_CODE' | 'REFACTOR_CODE' | 'RUN_COMPLIANCE_AUDIT',
+    action: 'GENERATE_REVIEW' | 'EXPLAIN_CODE' | 'REFACTOR_CODE' | 'RUN_COMPLIANCE_AUDIT' | 'RUN_AUTONOMOUS_LOOP',
     payload: { code: string; language: string; selection?: string; lensType?: string },
     onToken?: TokenCallback
   ): Promise<string> {
@@ -280,6 +309,13 @@ class LLMService {
 
     if (event === 'TELEMETRY_UPDATE') {
       this.onTelemetry?.(payload as TelemetryPayload);
+      return;
+    }
+
+    if (event === 'LOOP_PROGRESS') {
+      this.onLoopProgress?.(payload as LoopProgressPayload);
+      // Don't return, let the event handler resolve if needed, though for loop progress it doesn't resolve pending.
+      // Actually, since there's no specific handler in getEventHandler, we just return.
       return;
     }
 
@@ -310,6 +346,7 @@ class LLMService {
       WEBGPU_UNSUPPORTED: (id, p) =>
         this.handleWebGPUUnsupported(id, p as WebGPUUnsupportedPayload),
       TELEMETRY_UPDATE: () => {}, // Handled separately in handleWorkerMessage
+      LOOP_PROGRESS: () => {}, // Handled separately in handleWorkerMessage
     };
 
     return handlers[event] ?? (() => {});

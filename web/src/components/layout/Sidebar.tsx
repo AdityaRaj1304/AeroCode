@@ -13,6 +13,7 @@ import {
   Shield,
   ClipboardCheck,
   Zap,
+  Bug,
 } from 'lucide-react';
 import type {
   SidebarProps,
@@ -38,6 +39,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onRefactor,
   onExplain,
   onRunComplianceAudit,
+  onRunAutonomousLoop,
+  onTestCodeChange,
 }) => {
   const [chatInput, setChatInput] = useState('');
   const [chatMessages] = useState<ChatMessage[]>([]);
@@ -140,7 +143,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 ) : (
                   <>
                     <FileSearch className="h-4 w-4" />
-                    Scan Vulnerabilities
+                    Run Security Audit
                   </>
                 )}
               </button>
@@ -162,6 +165,49 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </>
                 )}
               </button>
+              
+              <button
+                onClick={onRunAutonomousLoop}
+                disabled={sidebarState.isProcessing}
+                className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300 transition-all duration-200 hover:border-emerald-500/50 hover:bg-emerald-500/20 hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {sidebarState.isProcessing && sidebarState.loopProgress ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Debugging...
+                  </>
+                ) : (
+                  <>
+                    <Bug className="h-4 w-4" />
+                    Run Autonomous Debugger
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Test Input & Tracker */}
+            <div className="flex flex-col gap-2 rounded-lg border border-white/5 bg-white/5 p-3">
+              <label className="text-xs font-semibold text-slate-300">Unit Tests (expect syntax)</label>
+              <textarea
+                value={sidebarState.testCode || ''}
+                onChange={(e) => onTestCodeChange?.(e.target.value)}
+                placeholder="expect(myFunc(1)).toEqual(2)"
+                className="min-h-[80px] w-full rounded border border-white/10 bg-black/50 p-2 text-xs font-mono text-emerald-400 placeholder-slate-600 outline-none focus:border-indigo-500/50"
+              />
+              
+              {sidebarState.loopProgress && (
+                <div className="mt-2 flex flex-col gap-2 rounded border border-indigo-500/20 bg-indigo-500/5 p-3">
+                  <span className="text-xs font-medium text-indigo-300">Debugger Progress:</span>
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    {sidebarState.loopProgress.status === 'success' && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
+                    {sidebarState.loopProgress.status === 'failed' && <AlertCircle className="h-3.5 w-3.5 text-red-400" />}
+                    {['testing', 'analyzing', 'applying_patch'].includes(sidebarState.loopProgress.status) && (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
+                    )}
+                    <span>{sidebarState.loopProgress.message}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Compliance Lenses (Horizontal Scroll) */}
@@ -201,7 +247,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <FileSearch className="h-6 w-6 text-slate-600" />
                 </div>
                 <p className="text-sm text-slate-500">
-                  Select code and click "Scan Vulnerabilities" or "Refactor Code" for insights
+                  Select code and click "Run Security Audit" or "Refactor Code" for insights
                 </p>
               </div>
             )}

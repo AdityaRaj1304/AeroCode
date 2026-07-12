@@ -228,30 +228,15 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
               onClick={onToggleParanoid}
               className={`flex items-center gap-2 rounded-md px-2 py-1 transition-colors ${
                 paranoid.isActive
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                  : 'hover:bg-white/5 text-slate-400 border border-transparent'
+                  ? 'hover:bg-white/5 text-slate-300'
+                  : 'hover:bg-white/5 text-slate-500 opacity-70'
               }`}
               title="Toggle Paranoid Mode (Blocks external requests)"
             >
-              <div className="relative flex h-2 w-2">
-                {paranoid.isActive && (
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                )}
-                <span
-                  className={`relative inline-flex h-2 w-2 rounded-full ${
-                    paranoid.isActive ? 'bg-emerald-500' : 'bg-slate-600'
-                  }`}
-                ></span>
-              </div>
-              <span className="font-semibold">
-                {paranoid.isActive ? 'PARANOID MODE: ACTIVE' : 'PARANOID MODE'}
+              <span className={`h-[6px] w-[6px] rounded-full ${paranoid.isActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-600'}`} />
+              <span className="font-mono text-[11px] font-medium">
+                AIR-GAPPED: {(paranoid.bytesLeaked / 1024).toFixed(2)} KB OUTBOUND
               </span>
-              {paranoid.isActive && (
-                <span className="ml-2 flex gap-2 text-[10px] text-emerald-400/80">
-                  <span>External API Calls: {paranoid.externalApiCalls}</span>
-                  <span>Data Leaked: {(paranoid.bytesLeaked / 1024).toFixed(2)} KB</span>
-                </span>
-              )}
             </button>
           )}
 

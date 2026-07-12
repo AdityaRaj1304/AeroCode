@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Layout from './components/layout/Layout';
+import { AlertTriangle } from 'lucide-react';
 import { llmService } from './services/llmService';
 import { networkMonitor } from './services/networkMonitor';
 import type {
@@ -11,17 +12,18 @@ import type {
   TelemetryPayload,
   ParanoidState,
   ComplianceLensType,
+  LoopProgressPayload,
 } from './types';
 
 // ── Default editor code ──────────────────────────────────────
 
-const DEFAULT_CODE = `// ✨ Welcome to AeroCode — Air-Gapped AI Pair Programmer
+const DEFAULT_CODE = `// AeroCode — Air-Gapped AI Pair Programmer
 //
-// All AI processing happens entirely on your device.
-// No data ever leaves your browser. 🔒
+// All processing executes entirely within the local device environment.
+// No data is transmitted to external servers.
 //
-// 1. Click "Load Model" in the top-right to download the AI model
-// 2. Once loaded, click "Analyze Code" in the AI panel →
+// 1. Click "Load Model" to initialize the local WebGPU engine.
+// 2. Select code and click "Run Security Audit" for local analysis.
 
 interface User {
   id: string;
@@ -138,6 +140,23 @@ function App() {
       }));
     };
 
+    llmService.onLoopProgress = (payload: LoopProgressPayload) => {
+      setSidebarState((prev) => ({
+        ...prev,
+        loopProgress: payload,
+        isProcessing: payload.status !== 'success' && payload.status !== 'failed',
+      }));
+
+      // If success, we want to pop open the Diff Editor with the new code
+      if (payload.status === 'success' && payload.code) {
+        setEditorState((prev) => ({
+          ...prev,
+          showDiff: true,
+          modifiedValue: payload.code,
+        }));
+      }
+    };
+
     return () => {
       llmService.dispose();
     };
@@ -210,11 +229,18 @@ function App() {
   }, []);
 
   const handleTabChange = useCallback((tab: SidebarTab) => {
-    setSidebarState((prev) => ({
-      ...prev,
-      activeTab: tab,
-    }));
-  }, []);
+      setSidebarState((prev) => ({
+        ...prev,
+        activeTab: tab,
+      }));
+    }, []);
+  
+    const handleTestCodeChange = useCallback((testCode: string) => {
+      setSidebarState((prev) => ({
+        ...prev,
+        testCode,
+      }));
+    }, []);
 
   // ── Analyze / Explain (Worker-backed) ──────────────────────
 
@@ -331,6 +357,24 @@ function App() {
     }));
   }, [editorState]);
 
+  const handleRunAutonomousLoop = useCallback(async () => {
+    if (!editorState.value.trim() || !sidebarState.testCode?.trim()) return;
+
+    setSidebarState((prev) => ({ 
+      ...prev, 
+      isProcessing: true, 
+      isOpen: true,
+      activeTab: 'review',
+      loopProgress: { status: 'testing', attempt: 1, maxAttempts: 3, message: 'Starting...' }
+    }));
+
+    await llmService.runAutonomousLoop(
+      editorState.value,
+      editorState.language,
+      sidebarState.testCode
+    );
+  }, [editorState, sidebarState.testCode]);
+
   const handleToggleParanoid = useCallback(() => {
     setParanoidState((prev) => {
       const nextActive = !prev.isActive;
@@ -359,6 +403,8 @@ function App() {
         onRefactor={handleRefactorCode}
         onExplain={handleExplainCode}
         onRunComplianceAudit={handleRunComplianceAudit}
+        onRunAutonomousLoop={handleRunAutonomousLoop}
+        onTestCodeChange={handleTestCodeChange}
         onInitModel={handleInitModel}
         onSelectionChange={handleSelectionChange}
         onToggleDiff={handleToggleDiff}
@@ -372,8 +418,8 @@ function App() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="mx-4 max-w-lg rounded-2xl border border-red-500/20 bg-[#12121a] p-6 shadow-2xl">
             <div className="mb-3 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10">
-                <span className="text-lg">⚠️</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10 text-red-400">
+                <AlertTriangle className="h-5 w-5" />
               </div>
               <h3 className="text-lg font-semibold text-white">
                 WebGPU Not Available

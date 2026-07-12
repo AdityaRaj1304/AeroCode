@@ -26,6 +26,8 @@ export interface LayoutProps {
   onRefactor: () => void;
   onExplain?: () => void;
   onRunComplianceAudit?: (lensType: ComplianceLensType) => void;
+  onRunAutonomousLoop?: () => void;
+  onTestCodeChange?: (code: string) => void;
   onInitModel?: () => void;
   onSelectionChange?: (selection: any) => void;
   onToggleDiff?: () => void;
@@ -58,6 +60,8 @@ const Layout: React.FC<LayoutProps> = ({
   onRefactor,
   onExplain,
   onRunComplianceAudit,
+  onRunAutonomousLoop,
+  onTestCodeChange,
   onInitModel,
   onSelectionChange,
   onToggleDiff,
@@ -73,6 +77,7 @@ const Layout: React.FC<LayoutProps> = ({
         onToggleSidebar={onToggleSidebar}
         isSidebarOpen={sidebarState.isOpen}
         onInitModel={onInitModel}
+        paranoid={paranoid}
       />
 
       {/* Main Content Area */}
@@ -100,6 +105,8 @@ const Layout: React.FC<LayoutProps> = ({
           onRefactor={onRefactor}
           onExplain={onExplain}
           onRunComplianceAudit={onRunComplianceAudit}
+          onRunAutonomousLoop={onRunAutonomousLoop}
+          onTestCodeChange={onTestCodeChange}
         />
       </div>
     </div>

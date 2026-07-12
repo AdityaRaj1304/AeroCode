@@ -62,6 +62,8 @@ export interface SidebarState {
   reviews: AIReviewResult[];
   isProcessing: boolean;
   explanationStream?: string;
+  testCode?: string;
+  loopProgress?: LoopProgressPayload;
 }
 
 /** Available sidebar tab identifiers. */
@@ -73,6 +75,7 @@ export interface NavbarProps {
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
   onInitModel?: () => void;
+  paranoid?: ParanoidState;
 }
 
 /** Props for the code editor wrapper. */
@@ -96,12 +99,15 @@ export interface SidebarProps {
   onRefactor: () => void;
   onExplain?: () => void;
   onRunComplianceAudit?: (lensType: ComplianceLensType) => void;
+  onRunAutonomousLoop?: () => void;
+  onTestCodeChange?: (code: string) => void;
   onInitModel?: () => void;
 }
 
 /** Props for the StatusBadge UI component. */
 export interface StatusBadgeProps {
   status: AirGapStatus;
+  paranoid?: ParanoidState;
 }
 
 /** Props for a generic collapsible panel. */

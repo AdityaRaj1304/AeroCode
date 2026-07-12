@@ -24,6 +24,7 @@ const Navbar: React.FC<NavbarProps> = ({
   onToggleSidebar,
   isSidebarOpen,
   onInitModel,
+  paranoid,
 }) => {
   const showLoadButton =
     !status.modelLoaded &&
@@ -65,7 +66,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
         {/* Center — Status */}
         <div className="absolute left-1/2 -translate-x-1/2">
-          <StatusBadge status={status} />
+          <StatusBadge status={status} paranoid={paranoid} />
         </div>
 
         {/* Right — Actions */}
