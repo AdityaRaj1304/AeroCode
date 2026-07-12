@@ -1,8 +1,10 @@
 import React from 'react';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
+import FileExplorer from './FileExplorer';
 import CodeEditor from '../editor/CodeEditor';
 import type {
+  FileSystemNode,
   AirGapStatus,
   EditorState,
   SidebarState,
@@ -34,6 +36,9 @@ export interface LayoutProps {
   telemetry?: TelemetryPayload;
   paranoid?: ParanoidState;
   onToggleParanoid?: () => void;
+  fileTree?: FileSystemNode | null;
+  onOpenDirectory?: () => void;
+  onOpenFile?: (fileHandle: any, fileName: string) => void;
 }
 
 /**
@@ -68,6 +73,9 @@ const Layout: React.FC<LayoutProps> = ({
   telemetry,
   paranoid,
   onToggleParanoid,
+  fileTree,
+  onOpenDirectory,
+  onOpenFile,
 }) => {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0a0a0f]">
@@ -82,8 +90,19 @@ const Layout: React.FC<LayoutProps> = ({
 
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
+        
+        {/* Left Sidebar — File Explorer */}
+        {onOpenDirectory && onOpenFile && (
+          <FileExplorer
+            fileTree={fileTree || null}
+            onOpenDirectory={onOpenDirectory}
+            onOpenFile={onOpenFile}
+            activeHandleName={editorState.fileName}
+          />
+        )}
+
         {/* Editor — fills remaining space */}
-        <div className="flex-1 overflow-hidden transition-all duration-300">
+        <div className="flex-1 overflow-hidden transition-all duration-300 relative z-10 border-l border-white/5">
           <CodeEditor
             editorState={editorState}
             onEditorChange={onEditorChange}

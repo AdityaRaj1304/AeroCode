@@ -21,6 +21,7 @@ export interface EditorState {
   fileName: string;
   cursorPosition: CursorPosition;
   selection?: TextSelection; // Currently highlighted text
+  activeFileHandle?: any; // FileSystemFileHandle is not always in global TS types natively
 }
 
 /** Cursor location within the editor. */
@@ -285,4 +286,16 @@ export interface LoopProgressPayload {
   message?: string;
   code?: string; // Contains the final patched code on 'success' or intermediate code on 'applying_patch'
   stackTrace?: string; // Captured error
+}
+
+// ============================================================
+// File System Types
+// ============================================================
+
+export interface FileSystemNode {
+  name: string;
+  kind: 'file' | 'directory';
+  handle: any; // FileSystemHandle
+  children?: FileSystemNode[];
+  isOpen?: boolean; // UI state for directories
 }

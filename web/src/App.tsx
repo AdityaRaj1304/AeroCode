@@ -3,7 +3,9 @@ import Layout from './components/layout/Layout';
 import { AlertTriangle } from 'lucide-react';
 import { llmService } from './services/llmService';
 import { networkMonitor } from './services/networkMonitor';
+import { fileSystem } from './services/fileSystem';
 import type {
+  FileSystemNode,
   AirGapStatus,
   EditorState,
   SidebarState,
@@ -22,45 +24,56 @@ const DEFAULT_CODE = `// AeroCode — Air-Gapped AI Pair Programmer
 // All processing executes entirely within the local device environment.
 // No data is transmitted to external servers.
 //
-// 1. Click "Load Model" to initialize the local WebGPU engine.
+// 1. Click "Open Folder" in the Explorer to load a local project.
 // 2. Select code and click "Run Security Audit" for local analysis.
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'editor' | 'viewer';
-  createdAt: Date;
+#include <iostream>
+#include <vector>
+#include <string>
+#include <algorithm>
+
+struct User {
+    std::string id;
+    std::string name;
+    std::string email;
+    std::string role;
+};
+
+class UserManager {
+private:
+    std::vector<User> users;
+
+public:
+    void addUser(const User& user) {
+        users.push_back(user);
+    }
+
+    std::vector<User> getAdmins() const {
+        std::vector<User> admins;
+        std::copy_if(users.begin(), users.end(), std::back_inserter(admins),
+            [](const User& u) { return u.role == "admin"; });
+        return admins;
+    }
+    
+    void printAdmins() const {
+        auto admins = getAdmins();
+        std::cout << "Found " << admins.size() << " admin users\\n";
+        for (const auto& admin : admins) {
+            std::cout << "  -> " << admin.name << "\\n";
+        }
+    }
+};
+
+int main() {
+    UserManager manager;
+    manager.addUser({"1", "Alice", "alice@example.com", "admin"});
+    manager.addUser({"2", "Bob", "bob@example.com", "viewer"});
+    manager.addUser({"3", "Charlie", "charlie@example.com", "admin"});
+
+    manager.printAdmins();
+
+    return 0;
 }
-
-async function fetchUsers(apiUrl: string): Promise<User[]> {
-  const response = await fetch(apiUrl);
-
-  if (!response.ok) {
-    throw new Error(\`Failed to fetch users: \${response.statusText}\`);
-  }
-
-  const data = await response.json();
-  return data.users.map((user: Record<string, unknown>) => ({
-    ...user,
-    createdAt: new Date(user.createdAt as string),
-  }));
-}
-
-function filterActiveAdmins(users: User[]): User[] {
-  return users.filter((user) => user.role === 'admin');
-}
-
-// Example usage
-const API_URL = 'https://api.example.com/v1';
-
-fetchUsers(API_URL)
-  .then(filterActiveAdmins)
-  .then((admins) => {
-    console.log(\`Found \${admins.length} admin users\`);
-    admins.forEach((admin) => console.log(\`  → \${admin.name}\`));
-  })
-  .catch(console.error);
 `;
 
 // ── App Component ────────────────────────────────────────────
@@ -77,12 +90,15 @@ function App() {
 
   // ── Editor State ───────────────────────────────────────────
   const [editorState, setEditorState] = useState<EditorState>({
-    language: 'typescript',
+    language: 'cpp',
     value: DEFAULT_CODE,
     theme: 'aerocode-dark',
-    fileName: 'example.ts',
+    fileName: 'example.cpp',
     cursorPosition: { line: 1, column: 1 },
   });
+
+  // ── File System State ──────────────────────────────────────
+  const [fileTree, setFileTree] = useState<FileSystemNode | null>(null);
 
   // ── Sidebar State ──────────────────────────────────────────
   const [sidebarState, setSidebarState] = useState<SidebarState>({
@@ -162,6 +178,26 @@ function App() {
     };
   }, []);
 
+  // ── Keyboard Shortcuts (Ctrl+S) ───────────────────────────
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (editorState.activeFileHandle) {
+          console.log('[AeroCode] Saving file...', editorState.fileName);
+          const success = await fileSystem.writeFile(editorState.activeFileHandle, editorState.value);
+          if (success) {
+            console.log('[AeroCode] Saved successfully!');
+            // Could add a toast notification here
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editorState.activeFileHandle, editorState.value, editorState.fileName]);
+
   // ── Model Initialization ───────────────────────────────────
 
   const handleInitModel = useCallback(async () => {
@@ -217,6 +253,32 @@ function App() {
 
   const handleToggleDiff = useCallback(() => {
     setEditorState((prev) => ({ ...prev, showDiff: !prev.showDiff }));
+  }, []);
+
+  // ── File System Handlers ───────────────────────────────────
+
+  const handleOpenDirectory = useCallback(async () => {
+    const tree = await fileSystem.openDirectory();
+    if (tree) {
+      setFileTree(tree);
+    }
+  }, []);
+
+  const handleOpenFile = useCallback(async (fileHandle: any, fileName: string) => {
+    try {
+      const content = await fileSystem.readFile(fileHandle);
+      const language = fileSystem.getLanguageFromFileName(fileName);
+      setEditorState((prev) => ({
+        ...prev,
+        value: content,
+        language,
+        fileName,
+        activeFileHandle: fileHandle,
+        showDiff: false, // Reset diff view on new file
+      }));
+    } catch (err) {
+      console.error('[AeroCode] Failed to open file:', err);
+    }
   }, []);
 
   // ── Sidebar Handlers ───────────────────────────────────────
@@ -411,6 +473,9 @@ function App() {
         telemetry={telemetryState}
         paranoid={paranoidState}
         onToggleParanoid={handleToggleParanoid}
+        fileTree={fileTree}
+        onOpenDirectory={handleOpenDirectory}
+        onOpenFile={handleOpenFile}
       />
 
       {/* WebGPU Error Modal */}
