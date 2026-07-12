@@ -1,0 +1,18 @@
+# --- Local Server & Offline Asset Proxy ---
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+aiofiles>=23.2.1
+
+# --- Model Preparation & MLC Weight Downloading ---
+huggingface_hub>=0.21.0
+mlc-llm>=0.14.0
+torch>=2.2.0
+
+# --- Google Antigravity SDK & Agent Automation ---
+google-antigravity>=2.0.0
+python-dotenv>=1.0.1
+
+# --- CLI & Developer Formatting Tools ---
+rich>=13.7.0
+requests>=2.31.0
