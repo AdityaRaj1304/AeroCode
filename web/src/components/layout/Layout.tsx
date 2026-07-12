@@ -10,6 +10,7 @@ import type {
   CursorPosition,
   TelemetryPayload,
   ParanoidState,
+  ComplianceLensType,
 } from '../../types';
 
 /** Props for the main Layout component. */
@@ -24,6 +25,7 @@ export interface LayoutProps {
   onAnalyze: () => void;
   onRefactor: () => void;
   onExplain?: () => void;
+  onRunComplianceAudit?: (lensType: ComplianceLensType) => void;
   onInitModel?: () => void;
   onSelectionChange?: (selection: any) => void;
   onToggleDiff?: () => void;
@@ -55,6 +57,7 @@ const Layout: React.FC<LayoutProps> = ({
   onAnalyze,
   onRefactor,
   onExplain,
+  onRunComplianceAudit,
   onInitModel,
   onSelectionChange,
   onToggleDiff,
@@ -96,6 +99,7 @@ const Layout: React.FC<LayoutProps> = ({
           onAnalyze={onAnalyze}
           onRefactor={onRefactor}
           onExplain={onExplain}
+          onRunComplianceAudit={onRunComplianceAudit}
         />
       </div>
     </div>

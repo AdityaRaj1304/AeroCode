@@ -95,6 +95,7 @@ export interface SidebarProps {
   onAnalyze: () => void;
   onRefactor: () => void;
   onExplain?: () => void;
+  onRunComplianceAudit?: (lensType: ComplianceLensType) => void;
   onInitModel?: () => void;
 }
 
@@ -131,7 +132,11 @@ export type WorkerRequestAction =
   | 'INIT_MODEL'
   | 'GENERATE_REVIEW'
   | 'EXPLAIN_CODE'
-  | 'REFACTOR_CODE';
+  | 'REFACTOR_CODE'
+  | 'RUN_COMPLIANCE_AUDIT'
+  | 'RUN_AUTONOMOUS_LOOP';
+
+export type ComplianceLensType = 'owasp' | 'soc2' | 'complexity';
 
 /** Events the worker can send back to the UI. */
 export type WorkerResponseEvent =
@@ -142,13 +147,14 @@ export type WorkerResponseEvent =
   | 'GENERATION_COMPLETE'
   | 'GENERATION_ERROR'
   | 'WEBGPU_UNSUPPORTED'
-  | 'TELEMETRY_UPDATE';
+  | 'TELEMETRY_UPDATE'
+  | 'LOOP_PROGRESS';
 
 /** Message sent from the UI thread → Worker. */
 export interface WorkerRequest {
   id: string;
   action: WorkerRequestAction;
-  payload: InitModelPayload | GenerateReviewPayload | ExplainCodePayload | RefactorCodePayload;
+  payload: InitModelPayload | GenerateReviewPayload | ExplainCodePayload | RefactorCodePayload | RunComplianceAuditPayload | RunAutonomousLoopPayload;
 }
 
 /** Payload for INIT_MODEL action. */
@@ -156,25 +162,35 @@ export interface InitModelPayload {
   modelId: string;
 }
 
-/** Payload for GENERATE_REVIEW action. */
 export interface GenerateReviewPayload {
   code: string;
   language: string;
   selection?: string;
 }
 
-/** Payload for EXPLAIN_CODE action. */
 export interface ExplainCodePayload {
   code: string;
   language: string;
   selection?: string;
 }
 
-/** Payload for REFACTOR_CODE action. */
 export interface RefactorCodePayload {
   code: string;
   language: string;
   selection?: string;
+}
+
+export interface RunComplianceAuditPayload {
+  code: string;
+  language: string;
+  selection?: string;
+  lensType: ComplianceLensType;
+}
+
+export interface RunAutonomousLoopPayload {
+  code: string;
+  language: string;
+  testCode: string;
 }
 
 /** Message sent from Worker → UI thread. */
@@ -193,7 +209,8 @@ export type WorkerResponsePayload =
   | GenerationCompletePayload
   | GenerationErrorPayload
   | WebGPUUnsupportedPayload
-  | TelemetryPayload;
+  | TelemetryPayload
+  | LoopProgressPayload;
 
 /** Streaming progress during model download/initialization. */
 export interface InitProgressPayload {
@@ -252,4 +269,14 @@ export interface ParanoidState {
   isActive: boolean;
   externalApiCalls: number;
   bytesLeaked: number;
+}
+
+/** Payload for LOOP_PROGRESS event during Autonomous Debugger */
+export interface LoopProgressPayload {
+  status: 'testing' | 'analyzing' | 'applying_patch' | 'success' | 'failed';
+  attempt: number;
+  maxAttempts: number;
+  message?: string;
+  code?: string; // Contains the final patched code on 'success' or intermediate code on 'applying_patch'
+  stackTrace?: string; // Captured error
 }

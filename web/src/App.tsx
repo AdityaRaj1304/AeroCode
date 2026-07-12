@@ -8,9 +8,9 @@ import type {
   SidebarState,
   SidebarTab,
   CursorPosition,
-  AIReviewResult,
   TelemetryPayload,
   ParanoidState,
+  ComplianceLensType,
 } from './types';
 
 // ── Default editor code ──────────────────────────────────────
@@ -309,6 +309,28 @@ function App() {
     }
   }, [editorState]);
 
+  const handleRunComplianceAudit = useCallback(async (lensType: ComplianceLensType) => {
+    if (!editorState.value.trim()) return;
+    if (editorState.selection && !editorState.selection.text.trim()) return;
+
+    setSidebarState((prev) => ({ ...prev, isProcessing: true }));
+
+    const reviews = await llmService.runComplianceAudit(
+      editorState.value,
+      editorState.language,
+      lensType,
+      editorState.selection?.text
+    );
+
+    setSidebarState((prev) => ({
+      ...prev,
+      reviews,
+      isProcessing: false,
+      isOpen: true,
+      activeTab: 'review',
+    }));
+  }, [editorState]);
+
   const handleToggleParanoid = useCallback(() => {
     setParanoidState((prev) => {
       const nextActive = !prev.isActive;
@@ -336,6 +358,7 @@ function App() {
         onAnalyze={handleAnalyzeCode}
         onRefactor={handleRefactorCode}
         onExplain={handleExplainCode}
+        onRunComplianceAudit={handleRunComplianceAudit}
         onInitModel={handleInitModel}
         onSelectionChange={handleSelectionChange}
         onToggleDiff={handleToggleDiff}

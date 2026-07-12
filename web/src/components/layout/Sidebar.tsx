@@ -10,6 +10,9 @@ import {
   Info,
   AlertCircle,
   Send,
+  Shield,
+  ClipboardCheck,
+  Zap,
 } from 'lucide-react';
 import type {
   SidebarProps,
@@ -34,6 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onAnalyze,
   onRefactor,
   onExplain,
+  onRunComplianceAudit,
 }) => {
   const [chatInput, setChatInput] = useState('');
   const [chatMessages] = useState<ChatMessage[]>([]);
@@ -157,6 +161,36 @@ const Sidebar: React.FC<SidebarProps> = ({
                     Refactor Code (Diff)
                   </>
                 )}
+              </button>
+            </div>
+
+            {/* Compliance Lenses (Horizontal Scroll) */}
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+              <button
+                onClick={() => onRunComplianceAudit?.('owasp')}
+                disabled={sidebarState.isProcessing}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-orange-500/30 bg-gradient-to-r from-red-500/10 to-orange-500/10 px-3 py-1.5 text-[11px] font-medium text-orange-400 transition-all hover:border-orange-500/50 hover:from-red-500/20 hover:to-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Shield className="h-3.5 w-3.5" />
+                OWASP Top 10
+              </button>
+
+              <button
+                onClick={() => onRunComplianceAudit?.('soc2')}
+                disabled={sidebarState.isProcessing}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-blue-500/30 bg-gradient-to-r from-sky-500/10 to-blue-500/10 px-3 py-1.5 text-[11px] font-medium text-blue-400 transition-all hover:border-blue-500/50 hover:from-sky-500/20 hover:to-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ClipboardCheck className="h-3.5 w-3.5" />
+                SOC2 / PII Guard
+              </button>
+
+              <button
+                onClick={() => onRunComplianceAudit?.('complexity')}
+                disabled={sidebarState.isProcessing}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-fuchsia-500/30 bg-gradient-to-r from-purple-500/10 to-fuchsia-500/10 px-3 py-1.5 text-[11px] font-medium text-fuchsia-400 transition-all hover:border-fuchsia-500/50 hover:from-purple-500/20 hover:to-fuchsia-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                Complexity Profiler
               </button>
             </div>
 

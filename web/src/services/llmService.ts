@@ -156,6 +156,33 @@ class LLMService {
   }
 
   /**
+   * Run a specialized enterprise compliance audit (OWASP, SOC2, Complexity) with streaming tokens.
+   */
+  async runComplianceAudit(
+    code: string,
+    language: string,
+    lensType: 'owasp' | 'soc2' | 'complexity',
+    selection?: string,
+    onToken?: TokenCallback
+  ): Promise<AIReviewResult[]> {
+    if (!this._isReady) {
+      return this.getMockReviews(code);
+    }
+
+    try {
+      const raw = await this.requestGeneration(
+        'RUN_COMPLIANCE_AUDIT',
+        { code, language, selection, lensType } as any,
+        onToken
+      );
+      return this.parseReviewResponse(raw);
+    } catch (err) {
+      console.error('[LLMService] Compliance Audit failed:', err);
+      return this.getMockReviews(code);
+    }
+  }
+
+  /**
    * Generate a plain-English explanation with streaming tokens.
    */
   async explainCode(
@@ -236,8 +263,8 @@ class LLMService {
 
   /** Send a generation request and return a promise for the full text. */
   private requestGeneration(
-    action: 'GENERATE_REVIEW' | 'EXPLAIN_CODE' | 'REFACTOR_CODE',
-    payload: { code: string; language: string; selection?: string },
+    action: 'GENERATE_REVIEW' | 'EXPLAIN_CODE' | 'REFACTOR_CODE' | 'RUN_COMPLIANCE_AUDIT',
+    payload: { code: string; language: string; selection?: string; lensType?: string },
     onToken?: TokenCallback
   ): Promise<string> {
     return new Promise<string>((resolve, reject) => {

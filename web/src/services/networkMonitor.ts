@@ -133,7 +133,7 @@ class NetworkMonitorService {
         }, 0);
         return;
       }
-      self.originalXhrSend.call(this, body);
+      self.originalXhrSend.call(this, body as any);
     };
   }
 }
