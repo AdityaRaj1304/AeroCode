@@ -11,7 +11,6 @@ import type { CodeEditorProps } from '../../types';
  * - Full-height responsive layout
  * - Conditionally renders Standard Editor or Diff Editor
  * - Bottom status bar showing language, cursor position, and view toggles
- * - Custom dark theme registration
  */
 const CodeEditor: React.FC<CodeEditorProps> = ({
   editorState,
@@ -19,6 +18,9 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   onCursorChange,
   onSelectionChange,
   onToggleDiff,
+  telemetry,
+  paranoid,
+  onToggleParanoid,
 }) => {
   const standardEditorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null);
 
@@ -189,7 +191,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
       </div>
 
       {/* Status bar */}
-      <div className="flex h-7 items-center justify-between border-t border-white/5 bg-[#0d0d14] px-4 text-[11px] text-slate-500">
+      <div className="flex h-8 items-center justify-between border-t border-white/5 bg-[#0d0d14] px-4 text-[11px] text-slate-500">
         <div className="flex items-center gap-4">
           <span className="font-medium text-indigo-400">
             {editorState.language.toUpperCase()}
@@ -203,8 +205,58 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
               ({editorState.selection.endLine - editorState.selection.startLine + 1} lines selected)
             </span>
           )}
+          <div className="h-4 w-px bg-white/10" />
+          
+          {/* Telemetry Stats */}
+          {telemetry && telemetry.tokensPerSecond > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="text-emerald-400">
+                Speed: ~{telemetry.tokensPerSecond} t/s
+              </span>
+              <span className="text-slate-400">
+                VRAM: {telemetry.estimatedVramMB} MB
+              </span>
+              <span className="text-indigo-300">Engine: WebGPU Local</span>
+            </div>
+          )}
         </div>
+        
         <div className="flex items-center gap-4">
+          {/* Paranoid Mode Toggle */}
+          {paranoid && (
+            <button
+              onClick={onToggleParanoid}
+              className={`flex items-center gap-2 rounded-md px-2 py-1 transition-colors ${
+                paranoid.isActive
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                  : 'hover:bg-white/5 text-slate-400 border border-transparent'
+              }`}
+              title="Toggle Paranoid Mode (Blocks external requests)"
+            >
+              <div className="relative flex h-2 w-2">
+                {paranoid.isActive && (
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                <span
+                  className={`relative inline-flex h-2 w-2 rounded-full ${
+                    paranoid.isActive ? 'bg-emerald-500' : 'bg-slate-600'
+                  }`}
+                ></span>
+              </div>
+              <span className="font-semibold">
+                {paranoid.isActive ? 'PARANOID MODE: ACTIVE' : 'PARANOID MODE'}
+              </span>
+              {paranoid.isActive && (
+                <span className="ml-2 flex gap-2 text-[10px] text-emerald-400/80">
+                  <span>External API Calls: {paranoid.externalApiCalls}</span>
+                  <span>Data Leaked: {(paranoid.bytesLeaked / 1024).toFixed(2)} KB</span>
+                </span>
+              )}
+            </button>
+          )}
+
+          <div className="h-4 w-px bg-white/10" />
+
           <button
             onClick={onToggleDiff}
             className={`flex items-center gap-1.5 rounded-md px-2 py-0.5 transition-colors ${
@@ -217,7 +269,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
             <Columns className="h-3 w-3" />
             Diff View
           </button>
-          <div className="h-3 w-px bg-white/10" />
+          <div className="h-4 w-px bg-white/10" />
           <span>UTF-8</span>
           <span>{editorState.fileName || 'untitled'}</span>
         </div>

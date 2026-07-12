@@ -20,6 +20,7 @@ import type {
   GenerationCompletePayload,
   GenerationErrorPayload,
   WebGPUUnsupportedPayload,
+  TelemetryPayload,
 } from '../types';
 
 // ── Callback types ───────────────────────────────────────────
@@ -61,6 +62,7 @@ class LLMService {
   // Callbacks set by the React UI
   public onProgress?: ProgressCallback;
   public onWebGPUError?: WebGPUErrorCallback;
+  public onTelemetry?: (payload: TelemetryPayload) => void;
 
   // ── Public getters ────────────────────────────────────────
 
@@ -248,6 +250,12 @@ class LLMService {
   /** Route worker messages to the appropriate handler. */
   private handleWorkerMessage(msg: WorkerResponse): void {
     const { id, event, payload } = msg;
+
+    if (event === 'TELEMETRY_UPDATE') {
+      this.onTelemetry?.(payload as TelemetryPayload);
+      return;
+    }
+
     const handler = this.getEventHandler(event);
     handler(id, payload);
   }
@@ -274,6 +282,7 @@ class LLMService {
         this.handleGenerationError(id, p as GenerationErrorPayload),
       WEBGPU_UNSUPPORTED: (id, p) =>
         this.handleWebGPUUnsupported(id, p as WebGPUUnsupportedPayload),
+      TELEMETRY_UPDATE: () => {}, // Handled separately in handleWorkerMessage
     };
 
     return handlers[event] ?? (() => {});

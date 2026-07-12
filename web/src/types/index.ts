@@ -82,6 +82,9 @@ export interface CodeEditorProps {
   onCursorChange: (position: CursorPosition) => void;
   onSelectionChange?: (selection: TextSelection | undefined) => void;
   onToggleDiff?: () => void;
+  telemetry?: TelemetryPayload;
+  paranoid?: ParanoidState;
+  onToggleParanoid?: () => void;
 }
 
 /** Props for the collapsible sidebar. */
@@ -138,7 +141,8 @@ export type WorkerResponseEvent =
   | 'TOKEN_STREAM'
   | 'GENERATION_COMPLETE'
   | 'GENERATION_ERROR'
-  | 'WEBGPU_UNSUPPORTED';
+  | 'WEBGPU_UNSUPPORTED'
+  | 'TELEMETRY_UPDATE';
 
 /** Message sent from the UI thread → Worker. */
 export interface WorkerRequest {
@@ -188,7 +192,8 @@ export type WorkerResponsePayload =
   | TokenStreamPayload
   | GenerationCompletePayload
   | GenerationErrorPayload
-  | WebGPUUnsupportedPayload;
+  | WebGPUUnsupportedPayload
+  | TelemetryPayload;
 
 /** Streaming progress during model download/initialization. */
 export interface InitProgressPayload {
@@ -216,6 +221,12 @@ export interface TokenStreamPayload {
   tokenIndex: number;
 }
 
+/** Payload for TELEMETRY_UPDATE event. */
+export interface TelemetryPayload {
+  tokensPerSecond: number;
+  estimatedVramMB: number;
+}
+
 /** Emitted when generation finishes. */
 export interface GenerationCompletePayload {
   fullText: string;
@@ -236,3 +247,9 @@ export interface WebGPUUnsupportedPayload {
   suggestion: string;
 }
 
+/** State for the Paranoid Mode monitor. */
+export interface ParanoidState {
+  isActive: boolean;
+  externalApiCalls: number;
+  bytesLeaked: number;
+}

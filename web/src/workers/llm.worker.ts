@@ -188,6 +188,8 @@ async function handleGenerateReview(
       stream: true,
     });
 
+    let lastTelemetryTime = performance.now();
+
     // Stream tokens back to the UI one-by-one
     for await (const chunk of asyncGenerator) {
       const delta = chunk.choices[0]?.delta?.content ?? '';
@@ -199,6 +201,17 @@ async function handleGenerateReview(
           fullText,
           tokenIndex,
         });
+
+        const now = performance.now();
+        if (now - lastTelemetryTime > 100) {
+          const elapsedSec = (now - startTime) / 1000;
+          const tps = elapsedSec > 0 ? Number((tokenIndex / elapsedSec).toFixed(1)) : 0;
+          respond(id, 'TELEMETRY_UPDATE', {
+            tokensPerSecond: tps,
+            estimatedVramMB: 384, // Estimated for Qwen2.5 0.5B
+          });
+          lastTelemetryTime = now;
+        }
       }
     }
 
@@ -249,6 +262,8 @@ async function handleExplainCode(
       stream: true,
     });
 
+    let lastTelemetryTime = performance.now();
+
     for await (const chunk of asyncGenerator) {
       const delta = chunk.choices[0]?.delta?.content ?? '';
       if (delta) {
@@ -259,6 +274,17 @@ async function handleExplainCode(
           fullText,
           tokenIndex,
         });
+
+        const now = performance.now();
+        if (now - lastTelemetryTime > 100) {
+          const elapsedSec = (now - startTime) / 1000;
+          const tps = elapsedSec > 0 ? Number((tokenIndex / elapsedSec).toFixed(1)) : 0;
+          respond(id, 'TELEMETRY_UPDATE', {
+            tokensPerSecond: tps,
+            estimatedVramMB: 384,
+          });
+          lastTelemetryTime = now;
+        }
       }
     }
 
@@ -309,6 +335,8 @@ async function handleRefactorCode(
       stream: true,
     });
 
+    let lastTelemetryTime = performance.now();
+
     for await (const chunk of asyncGenerator) {
       const delta = chunk.choices[0]?.delta?.content ?? '';
       if (delta) {
@@ -319,6 +347,17 @@ async function handleRefactorCode(
           fullText,
           tokenIndex,
         });
+
+        const now = performance.now();
+        if (now - lastTelemetryTime > 100) {
+          const elapsedSec = (now - startTime) / 1000;
+          const tps = elapsedSec > 0 ? Number((tokenIndex / elapsedSec).toFixed(1)) : 0;
+          respond(id, 'TELEMETRY_UPDATE', {
+            tokensPerSecond: tps,
+            estimatedVramMB: 384,
+          });
+          lastTelemetryTime = now;
+        }
       }
     }
 

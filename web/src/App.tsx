@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Layout from './components/layout/Layout';
 import { llmService } from './services/llmService';
+import { networkMonitor } from './services/networkMonitor';
 import type {
   AirGapStatus,
   EditorState,
@@ -8,6 +9,8 @@ import type {
   SidebarTab,
   CursorPosition,
   AIReviewResult,
+  TelemetryPayload,
+  ParanoidState,
 } from './types';
 
 // ── Default editor code ──────────────────────────────────────
@@ -90,6 +93,14 @@ function App() {
   // ── WebGPU Error State ─────────────────────────────────────
   const [gpuError, setGpuError] = useState<string | null>(null);
 
+  // ── Telemetry & Paranoid Mode ──────────────────────────────
+  const [telemetryState, setTelemetryState] = useState<TelemetryPayload | undefined>();
+  const [paranoidState, setParanoidState] = useState<ParanoidState>({
+    isActive: false,
+    externalApiCalls: 0,
+    bytesLeaked: 0,
+  });
+
   // ── Ref to avoid stale closures ────────────────────────────
   const initCalledRef = useRef(false);
 
@@ -112,6 +123,18 @@ function App() {
         ...prev,
         isOnline: false,
         loadProgress: 0,
+      }));
+    };
+
+    llmService.onTelemetry = (payload: TelemetryPayload) => {
+      setTelemetryState(payload);
+    };
+
+    networkMonitor.onActivity = (calls: number, bytes: number) => {
+      setParanoidState((prev) => ({
+        ...prev,
+        externalApiCalls: calls,
+        bytesLeaked: bytes,
       }));
     };
 
@@ -286,6 +309,18 @@ function App() {
     }
   }, [editorState]);
 
+  const handleToggleParanoid = useCallback(() => {
+    setParanoidState((prev) => {
+      const nextActive = !prev.isActive;
+      networkMonitor.isActive = nextActive;
+      return {
+        isActive: nextActive,
+        externalApiCalls: networkMonitor.stats.calls,
+        bytesLeaked: networkMonitor.stats.bytes,
+      };
+    });
+  }, []);
+
   // ── Render ─────────────────────────────────────────────────
 
   return (
@@ -304,6 +339,9 @@ function App() {
         onInitModel={handleInitModel}
         onSelectionChange={handleSelectionChange}
         onToggleDiff={handleToggleDiff}
+        telemetry={telemetryState}
+        paranoid={paranoidState}
+        onToggleParanoid={handleToggleParanoid}
       />
 
       {/* WebGPU Error Modal */}

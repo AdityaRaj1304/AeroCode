@@ -8,6 +8,8 @@ import type {
   SidebarState,
   SidebarTab,
   CursorPosition,
+  TelemetryPayload,
+  ParanoidState,
 } from '../../types';
 
 /** Props for the main Layout component. */
@@ -25,6 +27,9 @@ export interface LayoutProps {
   onInitModel?: () => void;
   onSelectionChange?: (selection: any) => void;
   onToggleDiff?: () => void;
+  telemetry?: TelemetryPayload;
+  paranoid?: ParanoidState;
+  onToggleParanoid?: () => void;
 }
 
 /**
@@ -53,6 +58,9 @@ const Layout: React.FC<LayoutProps> = ({
   onInitModel,
   onSelectionChange,
   onToggleDiff,
+  telemetry,
+  paranoid,
+  onToggleParanoid,
 }) => {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0a0a0f]">
@@ -74,6 +82,9 @@ const Layout: React.FC<LayoutProps> = ({
             onCursorChange={onCursorChange}
             onSelectionChange={onSelectionChange}
             onToggleDiff={onToggleDiff}
+            telemetry={telemetry}
+            paranoid={paranoid}
+            onToggleParanoid={onToggleParanoid}
           />
         </div>
 
