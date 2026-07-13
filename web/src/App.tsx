@@ -16,6 +16,7 @@ import type {
   ComplianceLensType,
   LoopProgressPayload,
 } from './types';
+import { PRESETS } from './utils/presets';
 
 // ── Default editor code ──────────────────────────────────────
 
@@ -27,51 +28,13 @@ const DEFAULT_CODE = `// AeroCode — Air-Gapped AI Pair Programmer
 // 1. Click "Open Folder" in the Explorer to load a local project.
 // 2. Select code and click "Run Security Audit" for local analysis.
 
-#include <iostream>
-#include <vector>
-#include <string>
-#include <algorithm>
+#include<iostream>
+using namespace std ;
 
-struct User {
-    std::string id;
-    std::string name;
-    std::string email;
-    std::string role;
-};
-
-class UserManager {
-private:
-    std::vector<User> users;
-
-public:
-    void addUser(const User& user) {
-        users.push_back(user);
-    }
-
-    std::vector<User> getAdmins() const {
-        std::vector<User> admins;
-        std::copy_if(users.begin(), users.end(), std::back_inserter(admins),
-            [](const User& u) { return u.role == "admin"; });
-        return admins;
-    }
-    
-    void printAdmins() const {
-        auto admins = getAdmins();
-        std::cout << "Found " << admins.size() << " admin users\\n";
-        for (const auto& admin : admins) {
-            std::cout << "  -> " << admin.name << "\\n";
-        }
-    }
-};
-
-int main() {
-    UserManager manager;
-    manager.addUser({"1", "Alice", "alice@example.com", "admin"});
-    manager.addUser({"2", "Bob", "bob@example.com", "viewer"});
-    manager.addUser({"3", "Charlie", "charlie@example.com", "admin"});
-
-    manager.printAdmins();
-
+int main (){
+    int a = 5 , b =0;
+    cout << a+5 << endl;
+    cout << a/b << endl;
     return 0;
 }
 `;
@@ -89,12 +52,15 @@ function App() {
   });
 
   // ── Editor State ───────────────────────────────────────────
-  const [editorState, setEditorState] = useState<EditorState>({
-    language: 'cpp',
-    value: DEFAULT_CODE,
-    theme: 'aerocode-dark',
-    fileName: 'example.cpp',
-    cursorPosition: { line: 1, column: 1 },
+  const [editorState, setEditorState] = useState<EditorState>(() => {
+    const saved = localStorage.getItem('aerocode_backup');
+    return {
+      language: 'cpp',
+      value: saved || DEFAULT_CODE,
+      theme: 'aerocode-dark',
+      fileName: 'example.cpp',
+      cursorPosition: { line: 1, column: 1 },
+    };
   });
 
   // ── File System State ──────────────────────────────────────
@@ -237,10 +203,12 @@ function App() {
   // ── Editor Handlers ────────────────────────────────────────
 
   const handleEditorChange = useCallback((value: string | undefined) => {
+    const newVal = value ?? '';
     setEditorState((prev) => ({
       ...prev,
-      value: value ?? '',
+      value: newVal,
     }));
+    localStorage.setItem('aerocode_backup', newVal);
   }, []);
 
   const handleCursorChange = useCallback((position: CursorPosition) => {
@@ -303,6 +271,26 @@ function App() {
         testCode,
       }));
     }, []);
+
+  const handleSelectPreset = useCallback((presetId: string) => {
+    const preset = PRESETS[presetId as keyof typeof PRESETS];
+    if (preset) {
+      setEditorState((prev) => ({
+        ...prev,
+        value: preset.code,
+        language: preset.language,
+        fileName: preset.fileName,
+        showDiff: false,
+      }));
+      if (preset.testCode !== undefined) {
+         setSidebarState((prev) => ({
+           ...prev,
+           testCode: preset.testCode
+         }));
+      }
+      localStorage.setItem('aerocode_backup', preset.code);
+    }
+  }, []);
 
   // ── Analyze / Explain (Worker-backed) ──────────────────────
 
@@ -420,7 +408,11 @@ function App() {
   }, [editorState]);
 
   const handleRunAutonomousLoop = useCallback(async () => {
-    if (!editorState.value.trim() || !sidebarState.testCode?.trim()) return;
+    if (!editorState.value.trim()) return;
+    if (!sidebarState.testCode?.trim()) {
+      alert("⚠️ Please write at least one unit test in the 'Unit Tests' section below before running the Autonomous Debugger!");
+      return;
+    }
 
     setSidebarState((prev) => ({ 
       ...prev, 
@@ -476,6 +468,7 @@ function App() {
         fileTree={fileTree}
         onOpenDirectory={handleOpenDirectory}
         onOpenFile={handleOpenFile}
+        onSelectPreset={handleSelectPreset}
       />
 
       {/* WebGPU Error Modal */}

@@ -39,6 +39,7 @@ export interface LayoutProps {
   fileTree?: FileSystemNode | null;
   onOpenDirectory?: () => void;
   onOpenFile?: (fileHandle: any, fileName: string) => void;
+  onSelectPreset?: (presetId: string) => void;
 }
 
 /**
@@ -76,6 +77,7 @@ const Layout: React.FC<LayoutProps> = ({
   fileTree,
   onOpenDirectory,
   onOpenFile,
+  onSelectPreset,
 }) => {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0a0a0f]">
@@ -86,6 +88,7 @@ const Layout: React.FC<LayoutProps> = ({
         isSidebarOpen={sidebarState.isOpen}
         onInitModel={onInitModel}
         paranoid={paranoid}
+        onSelectPreset={onSelectPreset}
       />
 
       {/* Main Content Area */}

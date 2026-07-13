@@ -25,6 +25,7 @@ const Navbar: React.FC<NavbarProps> = ({
   isSidebarOpen,
   onInitModel,
   paranoid,
+  onSelectPreset,
 }) => {
   const showLoadButton =
     !status.modelLoaded &&
@@ -70,7 +71,25 @@ const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right — Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Demo Presets Dropdown */}
+          {onSelectPreset && (
+            <select
+              onChange={(e) => {
+                if (e.target.value) {
+                  onSelectPreset(e.target.value);
+                  e.target.value = ""; // reset after selection
+                }
+              }}
+              className="rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs font-medium text-slate-300 outline-none transition-all hover:border-white/20 focus:border-indigo-500/50"
+            >
+              <option value="">Demo Presets...</option>
+              <option value="owasp">OWASP SQL Injection</option>
+              <option value="soc2">SOC2 API Key Leak</option>
+              <option value="tdd">TDD Buggy Function</option>
+            </select>
+          )}
+
           {/* Load Model button */}
           {showLoadButton && onInitModel && (
             <button

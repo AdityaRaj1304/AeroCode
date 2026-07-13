@@ -77,6 +77,7 @@ export interface NavbarProps {
   isSidebarOpen: boolean;
   onInitModel?: () => void;
   paranoid?: ParanoidState;
+  onSelectPreset?: (presetId: string) => void;
 }
 
 /** Props for the code editor wrapper. */
