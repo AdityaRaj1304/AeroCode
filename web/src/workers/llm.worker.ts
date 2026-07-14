@@ -522,7 +522,8 @@ ${payload.testCode}
 ## Stack Trace / Error:
 ${testResult.stackTrace}
 
-Fix the code so the tests pass. 
+Fix the code so the tests pass. Do NOT include any import statements, ES6 export keywords, or CommonJS module.exports in your output. Just output the clean, plain function definition.
+
 CRITICAL OUTPUT REQUIREMENT:
 You MUST output ONLY the raw, valid source code. You must NOT wrap the code in markdown backticks (e.g. \`\`\`). You must NOT include any introductory or explanatory text. Output ONLY the fixed code.`;
 
