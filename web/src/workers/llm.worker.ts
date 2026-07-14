@@ -567,7 +567,12 @@ You MUST output ONLY the raw, valid source code. You must NOT wrap the code in m
       }
 
       // Update currentCode with stripped text
-      currentCode = fullText.replace(/^```[\w-]*\n/gm, '').replace(/```\s*$/gm, '').trim();
+      const codeBlockMatch = fullText.match(/```[\w-]*\n([\s\S]*?)```/);
+      if (codeBlockMatch && codeBlockMatch[1]) {
+        currentCode = codeBlockMatch[1].trim();
+      } else {
+        currentCode = fullText.replace(/```/g, '').trim();
+      }
 
     } catch (err) {
       respond(id, 'LOOP_PROGRESS', {

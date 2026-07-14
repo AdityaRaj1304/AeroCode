@@ -234,7 +234,8 @@ class LLMService {
       );
       
       // Strict stripping of markdown blocks just in case the model ignores the prompt
-      return raw.replace(/^```[\w-]*\n/gm, '').replace(/```\s*$/gm, '').trim();
+      const codeBlockMatch = raw.match(/```[\w-]*\n([\s\S]*?)```/);
+      return codeBlockMatch && codeBlockMatch[1] ? codeBlockMatch[1].trim() : raw.replace(/```/g, '').trim();
     } catch (err) {
       console.error('[LLMService] Refactoring failed:', err);
       return code;

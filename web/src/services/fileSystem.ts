@@ -9,6 +9,10 @@ class FileSystemService {
    */
   async openDirectory(): Promise<FileSystemNode | null> {
     try {
+      if (typeof (window as any).showDirectoryPicker === 'undefined') {
+        alert("⚠️ Browser Compatibility Warning: The File System Access API is not supported in this browser.\n\nPlease use Google Chrome, Microsoft Edge, or a Chromium-based browser to open local directories.");
+        return null;
+      }
       // @ts-ignore - showDirectoryPicker is not in standard DOM types yet
       const directoryHandle = await window.showDirectoryPicker();
       return await this.buildFileTree(directoryHandle);
