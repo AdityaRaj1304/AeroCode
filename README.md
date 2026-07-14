@@ -2,85 +2,105 @@
 
 Air-Gapped AI Pair Programmer & Security Auditor.
 
-## Short Description
+AeroCode is a local-first, on-device AI pair programmer that runs entirely within your browser. By utilizing client-side WebGPU acceleration, it performs security audits, compliance analysis, and autonomous debugging completely offline—guaranteeing that not a single byte of your source code ever leaves your machine.
 
-AeroCode is a fully air-gapped AI pair programmer that runs locally entirely within your browser. All AI inference runs on-device via WebGPU—no proprietary source code or data ever leaves your machine.
+---
 
-## Problem Statement
+## Problem
 
-Developers working in highly secure, compliant, or air-gapped environments (such as defense, healthcare, and finance) often cannot use cloud-based AI tools like GitHub Copilot or ChatGPT due to strict data privacy and SOC2 constraints. This leaves them isolated from the productivity benefits and assistance of modern AI pair programming.
+What problem are you solving?
 
-## Solution Overview
+Developers working in highly secure, compliant, or air-gapped industries (such as defense, government, healthcare, and finance) are strictly prohibited from using cloud-based AI tools like GitHub Copilot or ChatGPT. Sending proprietary source code or confidential data to third-party APIs risks violating SOC2, exposing Personally Identifiable Information (PII), or leaking intellectual property. 
 
-AeroCode provides a complete, locally-hosted, in-browser AI pair programmer. By running the LLM directly on the user's hardware, it guarantees 100% data privacy while providing real-time code analysis, security auditing, and auto-completion.
+Consequently, these developers are locked out of the productivity gains of modern AI coding assistants.
 
-## Key Features Built for Mid-Eval
+---
 
-- **100% Offline Inference**: Runs entirely in the browser using WebGPU. You can physically disconnect your Wi-Fi and the AI continues to generate code.
-- **Live Privacy Telemetry**: A real-time status bar proving 0.00 KB Outbound network traffic during code analysis, guaranteeing zero data leakage.
-- **Enterprise Compliance Lenses**: One-click audit profiles specialized for enterprise security:
-  - **OWASP Top 10**: Scans for SQLi, XSS, and authentication vulnerabilities.
-  - **SOC2 / PII Guard**: Flags hardcoded secrets, exposed JWTs, and plain-text data logging.
-  - **Complexity Analysis**: Profiles Big-O bottlenecks and suggests optimized logic.
+## Solution
 
-## On-Device AI Explanation
+How does your project solve it?
 
-By leveraging the WebGPU API and the `@mlc-ai/web-llm` library, the application compiles and executes Large Language Models (like Qwen2.5-Coder) directly on the client's GPU within the browser sandbox. The model weights are downloaded once, cached locally in the browser's IndexedDB, and then used for completely offline inference. This enables zero-latency network trips and absolute data privacy.
+AeroCode brings AI pair programming directly inside the browser sandbox:
+1. **100% Air-Gapped**: All code analysis and refactoring are processed locally on your client machine. You can physically disconnect from the internet and the AI continues to generate code.
+2. **Zero Outbound Leakage**: A real-time **Paranoid Mode** telemetry status bar intercepts and blocks all outbound `fetch` and `XMLHttpRequest` traffic, proving 0.00 KB of data leaves your system during reviews.
+3. **Enterprise Compliance Lenses**: Run specialized audits at the click of a button:
+   - **OWASP Top 10**: Scans for vulnerabilities like SQL Injection and Cross-Site Scripting (XSS).
+   - **SOC2 / PII Guard**: Flags hardcoded credentials, exposed API secrets, and plain-text logging of sensitive variables.
+   - **Complexity Profiler**: Identifies Big-O scaling issues and suggests optimized logic.
+4. **Autonomous TDD Debugger**: Runs a local, sandboxed test evaluator. If assertions fail, it captures the stack trace, prompts the local model to write a patch, re-evaluates the tests, and opens a split-pane **Diff Editor** showing the automatic repair.
+
+---
+
+## On Device AI Usage
+
+What runs locally? What model/runtime/device is used?
+
+* **What Runs Locally**: The entire LLM inference runtime, token stream generation, prompt construction, and test assertions run locally on the client's device.
+* **Model**: `Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC` (compiled specifically for local browser execution).
+* **Runtime / Interface**: WebGPU API and the `@mlc-ai/web-llm` engine.
+* **Storage**: The model weights are downloaded once from Hugging Face, cached locally in the browser's IndexedDB, and compiled into shaders on the client GPU.
+* **Concurrency**: Runs inside a background Web Worker (`llm.worker.ts`) off the main thread, keeping the Monaco Editor layout butter-smooth during inference.
+
+---
 
 ## Tech Stack
 
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS
-- **Editor Engine**: Monaco Editor (`@monaco-editor/react`)
-- **AI Runtime**: WebGPU, Web-LLM (`@mlc-ai/web-llm`)
-- **Local Server/Tools**: Python, FastAPI, Hugging Face Hub (for optional offline asset proxying and model preparation)
+Languages, frameworks, models, runtimes, and tools.
 
-## Setup Instructions
+* **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4
+* **Editor Engine**: Monaco Editor (`@monaco-editor/react`)
+* **AI Runtime**: WebGPU, Web-LLM (`@mlc-ai/web-llm`)
+* **Test Sandbox**: In-browser Custom `expect` Assertion Engine (`new Function` scope)
+* **Local Proxy Tooling (Optional)**: Python 3, FastAPI, Hugging Face Hub (for asset caching in fully offline offline-only local proxy networks)
+
+---
+
+## Setup and Usage
+
+How can someone run or test it?
 
 ### Prerequisites
+* A modern browser supporting WebGPU (Google Chrome or Microsoft Edge v113+).
+* Node.js (v18+) installed.
 
-- Node.js (v18+)
-- Python 3.8+ (for optional backend tools)
-- A modern, WebGPU-enabled web browser (e.g., Google Chrome or Microsoft Edge v113+)
-
-### 1. Frontend Setup
+### 1. Installation
+Navigate to the `web` folder and install dependencies:
 ```bash
 cd web
 npm install
+```
+
+### 2. Running the Development Server
+Launch the local dev server:
+```bash
 npm run dev
 ```
+Open [http://localhost:5173/](http://localhost:5173/) in your WebGPU-supported browser.
 
-### 2. Backend / Offline Asset Proxy (Optional)
-```bash
-python -m venv venv
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
+### 3. Usage & Testing
+1. **Load the Model**: On the first launch, click **"Load Model"** in the top navbar. The progress bar will track the download of the model weights. Once cached, subsequent visits will load instantly.
+2. **Run Demo Presets**:
+   * Select **OWASP SQL Injection** from the dropdown, turn on **Paranoid Mode**, and click **OWASP Top 10**. Watch the AI identify the SQL injection fully offline.
+   * Select **SOC2 API Key Leak** and click **SOC2 / PII Guard** to see hardcoded secrets and email logging flagged.
+   * Select **TDD Buggy Function**, view the failing assertions in the sidebar, and click **Run Autonomous Debugger**. Watch it self-heal and display the diff.
+3. **Test the Air-Gap**: Unplug your internet cable or turn off your Wi-Fi and continue using the assistant.
 
-pip install -r requirements.txt
-```
+---
 
-## Usage Instructions
+## Demo and Screenshots
 
-1. Run the frontend development server and open `http://localhost:5173` in a WebGPU-enabled browser.
-2. On the first launch, the AI model (default: `Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC`) will download and cache locally. Watch the loading progress bar.
-3. Once cached, create or open a file in the workspace.
-4. Highlight vulnerable or complex code in the editor and click one of the Compliance Lenses (e.g., "OWASP Top 10") to run a specialized, air-gapped security audit.
-5. **Test the privacy guarantee**: Disconnect from the internet and continue using the AI pair programmer entirely offline.
+Demo video link and screenshots.
+
+* **Demo Video**: [Link to Presentation Video](https://youtube.com) *(Insert video link here)*
+* **Main Dashboard**:
+  ![Dashboard Screenshot](https://raw.githubusercontent.com/username/project/main/screenshots/dashboard.png) *(Insert dashboard screenshot here)*
+* **Autonomous Debugger Diff**:
+  ![Diff Screenshot](https://raw.githubusercontent.com/username/project/main/screenshots/diff.png) *(Insert diff screenshot here)*
+
+---
 
 ## License
 
-MIT License
+Name of the OSI-compliant license used.
 
-## Known Limitations and Future Scope
-
-### Limitations
-
-- **Hardware Dependent**: Model size and inference speed (t/s) are constrained by the client device's GPU performance and available VRAM.
-- **Initial Download**: The very first run requires an internet connection to securely cache the model weights locally before it can operate fully offline.
-
-### Future Scope
-
-- **Autonomous Test-Driven Debugging**: Implementing an agentic loop that runs unit tests, captures stack traces, generates patches, and re-evaluates until tests pass.
-- **LSP Integration**: Integration with Local Language Servers (LSP) for deeper, project-wide context awareness.
-- **Advanced Diff Editor Integration**: Expanding the side-by-side Diff view for multi-file refactoring.
+This project is licensed under the **MIT License** (an OSI-compliant license).
