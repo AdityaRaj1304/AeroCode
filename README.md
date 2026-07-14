@@ -96,6 +96,9 @@ Demo video link and screenshots.
   ![Dashboard Screenshot](https://raw.githubusercontent.com/username/project/main/screenshots/dashboard.png) *(Insert dashboard screenshot here)*
 * **Autonomous Debugger Diff**:
   ![Diff Screenshot](https://raw.githubusercontent.com/username/project/main/screenshots/diff.png) *(Insert diff screenshot here)*
+<img width="2426" height="528" alt="Screenshot 2026-07-15 011758" src="https://github.com/user-attachments/assets/84331080-2319-4edc-8fa3-60e07711aa7c" />
+
+
 
 ---
 
