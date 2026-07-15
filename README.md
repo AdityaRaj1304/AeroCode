@@ -89,7 +89,7 @@ Open [http://localhost:5173/](http://localhost:5173/) in your WebGPU-supported b
 
 ## Demo and Screenshots
 
-* **Demo Video**: [Link to Presentation Video](https://youtube.com) *(Insert video link here)*
+* **Demo Video**: [Link to Presentation Video](https://drive.google.com/file/d/1SYW6-L7xmc7Qo5ucRwbIZb8UwC1aXWzV/view?usp=sharing)
 * **Main Dashboard**:
   ![Dashboard Screenshot](./Screenshots/dashboard.png)
 * **Autonomous Debugger Diff**:
